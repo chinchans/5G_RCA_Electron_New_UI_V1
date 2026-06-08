@@ -80,26 +80,29 @@
             color: #075985 !important;
         }
         /* Unified Button Style - Override inline styles to ensure consistency */
-        button:not(.back-button):not(.menu-toggle):not(.template-modal-close):not(.close-btn):not(.status-close):not(.dropdown-btn):not(.landing-option-btn):not(.user-template-delete-btn):not(.workbench-btn):not(.workbench-top-tab):not(.spec-intel-btn):not(#bugFixPresentBtn):not(#crashAnalysisToggle):not(#clearDeploymentSettingsBtn),
+        button:not(.back-button):not(.menu-toggle):not(.template-modal-close):not(.close-btn):not(.status-close):not(.dropdown-btn):not(.landing-option-btn):not(.user-template-delete-btn):not(.workbench-btn):not(.workbench-top-tab):not(.spec-intel-btn):not(.prompt-studio-btn):not(.prompt-studio-new-btn):not(.prompt-studio-edit-icon):not(.prompt-studio-category-card):not(.activity-log-btn):not(.activity-timeline-row):not(.bd-btn):not(.te-btn):not(.tsg-btn):not(.td-btn):not(.ce-btn-run-review):not(.ca-btn-primary):not(.template-modal-btn.cancel):not(.prompt-studio-btn--danger):not(.td-loglevel-picker-btn):not(.td-loglevel-subitem):not(#crashAnalysisToggle),
         .launch-btn,
         .home-btn,
         .template-btn:not([id*="Toggle"]):not([id*="FixPresent"]),
-        .template-modal-btn,
+        .template-modal-btn:not(.cancel),
         .select-template-btn,
         .btn,
         .btn-primary,
         .btn-secondary {
-            background-color: #e0f2fe !important;
-            background: #e0f2fe !important;
-            color: #0369a1 !important;
-            border: 1px solid #bae6fd !important;
+            background-color: #6b7280 !important;
+            background: #6b7280 !important;
+            color: #ffffff !important;
+            border: none !important;
             border-radius: 6px !important;
-            padding: 0.75rem 1.5rem !important;
+            opacity: var(--app-btn-computed-opacity, 1);
+            padding: 0.6rem 1.1rem !important;
             font-weight: 600 !important;
-            font-size: 0.9rem !important;
-            transition: all 0.3s ease !important;
+            font-size: 0.875rem !important;
+            transition: background-color 0.15s ease !important;
+            transform: none !important;
+            box-shadow: none !important;
         }
-        button:not(.back-button):not(.menu-toggle):not(.template-modal-close):not(.close-btn):not(.status-close):not(.dropdown-btn):not(.landing-option-btn):not(.user-template-delete-btn):not(.workbench-btn):not(.workbench-top-tab):not(.spec-intel-btn):hover:not(#bugFixPresentBtn):not(#crashAnalysisToggle):not(#clearDeploymentSettingsBtn),
+        button:not(.back-button):not(.menu-toggle):not(.template-modal-close):not(.close-btn):not(.status-close):not(.dropdown-btn):not(.landing-option-btn):not(.user-template-delete-btn):not(.workbench-btn):not(.workbench-top-tab):not(.spec-intel-btn):not(.prompt-studio-btn):not(.prompt-studio-new-btn):not(.prompt-studio-edit-icon):not(.prompt-studio-category-card):not(.activity-log-btn):not(.activity-timeline-row):not(.bd-btn):not(.te-btn):not(.tsg-btn):not(.td-btn):not(.ce-btn-run-review):not(.ca-btn-primary):not(.template-modal-btn.cancel):not(.prompt-studio-btn--danger):not(.td-loglevel-picker-btn):not(.td-loglevel-subitem):hover:not(#crashAnalysisToggle),
         .launch-btn:hover,
         .home-btn:hover,
         .template-btn:hover:not([id*="Toggle"]):not([id*="FixPresent"]),
@@ -108,11 +111,11 @@
         .btn:hover:not(:disabled),
         .btn-primary:hover:not(:disabled),
         .btn-secondary:hover:not(:disabled) {
-            background-color: #bae6fd !important;
-            color: #075985 !important;
-            border-color: #7dd3fc !important;
-            transform: translateY(-2px) !important;
-            box-shadow: 0 4px 12px rgba(93, 146, 255, 0.3) !important;
+            background-color: #4b5563 !important;
+            color: #ffffff !important;
+            border: none !important;
+            transform: none !important;
+            box-shadow: none !important;
         }
         /* Cancel buttons keep gray style */
         .template-modal-btn.cancel {
@@ -124,6 +127,26 @@
             background-color: #6b7280 !important;
             border-color: #6b7280 !important;
             color: white !important;
+        }
+        /* Test Deployment param dropdowns — align SubcarrierSpacing menu with Logging level panel */
+        body > #tdSubcarrierSpacingDropdownMenu.portal-dropdown-menu {
+            border: 1px solid #cfd5dd !important;
+            border-radius: 6px !important;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12) !important;
+            padding: 0 !important;
+        }
+        body > #tdSubcarrierSpacingDropdownMenu .dropdown-item {
+            padding: 0.42rem 0.55rem !important;
+            font-size: 0.82rem !important;
+            font-weight: 500 !important;
+            color: #374151 !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+            animation: none !important;
+            transform: none !important;
+        }
+        body > #tdSubcarrierSpacingDropdownMenu .dropdown-item:hover {
+            background: #f3f4f6 !important;
+            color: #374151 !important;
         }
     </style>
 </head>
@@ -180,11 +203,11 @@
         <!-- Header -->
         <header class="header">
             <button class="menu-toggle" id="menuToggle" type="button" aria-label="Toggle navigation menu">
-                <span class="material-icons" data-icon="menu" aria-hidden="true"></span>
+                <span class="material-icons" data-icon="menu" aria-hidden="true">☰</span>
             </button>
             <div class="logo">TCS Agentic 5G Radio Workbench</div>
             <button class="back-button" id="backButton" title="Back to Home">
-                <span class="material-icons" data-icon="home"></span>
+                <span class="material-icons" data-icon="home">⌂</span>
             </button>
            
         </header>
@@ -259,27 +282,27 @@
                                 <section class="workbench-metrics" aria-label="Key metrics">
                                     <article class="workbench-kpi-card">
                                         <h2 class="workbench-kpi-label">Spec Entries Extracted</h2>
-                                        <p class="workbench-kpi-value">0</p>
+                                        <p class="workbench-kpi-value" id="homeKpiSpecValue">0</p>
                                         <div class="workbench-kpi-bar workbench-kpi-bar--blue"></div>
-                                        <p class="workbench-kpi-meta">0 spec documents</p>
+                                        <p class="workbench-kpi-meta" id="homeKpiSpecMeta">0 spec documents</p>
                                     </article>
                                     <article class="workbench-kpi-card">
                                         <h2 class="workbench-kpi-label">Test Scripts Generated</h2>
-                                        <p class="workbench-kpi-value">0</p>
+                                        <p class="workbench-kpi-value" id="homeKpiTsgValue">0</p>
                                         <div class="workbench-kpi-bar workbench-kpi-bar--green"></div>
-                                        <p class="workbench-kpi-meta">Run #0 · Python · pytest</p>
+                                        <p class="workbench-kpi-meta" id="homeKpiTsgMeta">Run #0 · Python · pytest</p>
                                     </article>
                                     <article class="workbench-kpi-card">
                                         <h2 class="workbench-kpi-label">Tests Executed</h2>
-                                        <p class="workbench-kpi-value">0</p>
+                                        <p class="workbench-kpi-value" id="homeKpiTeValue">0</p>
                                         <div class="workbench-kpi-bar workbench-kpi-bar--blue"></div>
-                                        <p class="workbench-kpi-meta"><span class="workbench-pass">0 pass</span> · <span class="workbench-fail">0 fail</span> · Run #0</p>
+                                        <p class="workbench-kpi-meta"><span class="workbench-pass" id="homeKpiTePass">0 pass</span> · <span class="workbench-fail" id="homeKpiTeFail">0 fail</span> · <span id="homeKpiTeRun">Run #0</span></p>
                                     </article>
                                     <article class="workbench-kpi-card">
-                                        <h2 class="workbench-kpi-label">Bugs Found · Patches Ready</h2>
-                                        <p class="workbench-kpi-value workbench-kpi-value--danger">0</p>
+                                        <h2 class="workbench-kpi-label">Bugs Found</h2>
+                                        <p class="workbench-kpi-value workbench-kpi-value--danger" id="homeKpiBdValue">0</p>
                                         <div class="workbench-kpi-bar workbench-kpi-bar--red"></div>
-                                        <p class="workbench-kpi-meta">0 real defects · 0 patches generated</p>
+                                        <p class="workbench-kpi-meta" id="homeKpiBdMeta">0 real defects · 0 patches generated</p>
                                     </article>
                                 </section>
 
@@ -380,28 +403,24 @@
                                         <h1 class="spec-intel-page-title">Specification Intelligence</h1>
                                         <p class="spec-intel-page-subtitle">Parse 3GPP/O-RAN spec documents · extract structured datasets · feed test generation</p>
                                     </div>
-                                    <div class="spec-intel-page-header-actions">
-                                        <button type="button" class="spec-intel-btn spec-intel-btn-outline spec-intel-btn-placeholder" id="specIntelLoadPreviousBtn" data-placeholder="true">Load Previous</button>
-                                        <button type="button" class="spec-intel-btn spec-intel-btn-primary spec-intel-btn-placeholder" id="specIntelRunExtractionBtn" data-placeholder="true">Run Extraction</button>
-                                    </div>
                                 </header>
 
                                 <section class="spec-intel-metrics" aria-label="Extraction metrics">
                                     <article class="spec-intel-metric-card">
                                         <h2 class="spec-intel-metric-label">Sections Extracted</h2>
-                                        <p class="spec-intel-metric-value">0</p>
+                                        <p class="spec-intel-metric-value" id="specIntelMetricSections">0</p>
                                         <div class="spec-intel-metric-bar spec-intel-metric-bar--blue"></div>
-                                        <p class="spec-intel-metric-meta">from 0 spec documents</p>
+                                        <p class="spec-intel-metric-meta" id="specIntelMetricSectionsMeta">from 0 spec documents</p>
                                     </article>
                                     <article class="spec-intel-metric-card">
                                         <h2 class="spec-intel-metric-label">Dataset Entries</h2>
-                                        <p class="spec-intel-metric-value spec-intel-metric-value--green">0</p>
+                                        <p class="spec-intel-metric-value spec-intel-metric-value--green" id="specIntelMetricDatasetEntries">0</p>
                                         <div class="spec-intel-metric-bar spec-intel-metric-bar--green"></div>
-                                        <p class="spec-intel-metric-meta">Exported to JSON · ready for test gen</p>
+                                        <p class="spec-intel-metric-meta">ready for test gen</p>
                                     </article>
                                     <article class="spec-intel-metric-card">
                                         <h2 class="spec-intel-metric-label">Subsections Indexed</h2>
-                                        <p class="spec-intel-metric-value">0</p>
+                                        <p class="spec-intel-metric-value" id="specIntelMetricSubsections">0</p>
                                         <div class="spec-intel-metric-bar spec-intel-metric-bar--blue"></div>
                                         <p class="spec-intel-metric-meta">Chunked and vectorised</p>
                                     </article>
@@ -427,7 +446,6 @@
                                                     <p id="workingDirText" class="spec-intel-field-value spec-intel-field-value--mono folder-path-ellipsize">extract</p>
                                                     <button type="button" id="workingDirBtn" class="spec-intel-btn spec-intel-btn-outline spec-intel-btn-sm">Browse</button>
                                                 </div>
-                                                <p class="spec-intel-field-status" id="workingDirStatus">Intact · 0 PDFs · 0 pages</p>
                                             </div>
                                             <div class="spec-intel-field">
                                                 <label class="spec-intel-field-label" for="outputDirText">Target Directory</label>
@@ -442,7 +460,6 @@
                                                     <p id="documentText" class="spec-intel-field-value spec-intel-field-value--mono">No file selected</p>
                                                     <button type="button" id="documentBtn" class="spec-intel-btn spec-intel-btn-outline spec-intel-btn-sm">Load Document</button>
                                                 </div>
-                                                <p class="spec-intel-field-status" id="documentStatus" style="display: none;">Loaded · 0 sections identified</p>
                                             </div>
                                         </div>
                                         <input type="file" id="documentInput" accept=".pdf,.doc,.docx,.txt,.html" style="display: none;" />
@@ -461,7 +478,7 @@
                                                     <p class="spec-intel-card-subtitle">Choose section and subsection to extract</p>
                                                 </div>
                                             </div>
-                                            <span class="spec-intel-badge">0 available</span>
+                                            <span class="spec-intel-badge" id="specIntelAvailableBadge">0 available</span>
                                         </div>
                                         <div class="spec-intel-card-body">
                                             <div class="spec-intel-dropdowns-row">
@@ -494,31 +511,21 @@
                                             </div>
                                             <div class="spec-intel-actions-row">
                                                 <button type="button" class="spec-intel-btn spec-intel-btn-primary" id="extractDatasetBtn">Extract</button>
-                                                <button type="button" class="spec-intel-btn spec-intel-btn-outline spec-intel-btn-placeholder" id="specIntelPreviewSectionBtn" data-placeholder="true">Preview Section</button>
-                                            </div>
-                                            <div class="spec-intel-preview">
-                                                <label class="spec-intel-field-label">Extracted Preview</label>
-                                                <div class="spec-intel-preview-box" id="specIntelPreviewBox">
-                                                    <pre class="spec-intel-preview-code"><span class="spec-preview-cyan">§5.1.3.1 MCS Index Table 1</span>
-<span class="spec-preview-muted">· TS 38.214 · 64 entries // QPSK / 16QAM / 64QAM / 256QAM modulation orders</span>
-<span class="spec-preview-orange">MCS_idx  Modulation  Code_Rate×1024  Efficiency</span>
-<span class="spec-preview-green">0        QPSK        120           0.2344</span>
-<span class="spec-preview-green">1        QPSK        157           0.3066</span>
-<span class="spec-preview-green">2        QPSK        193           0.3770</span>
-<span class="spec-preview-path">→ /datasets/spec_extractions/mcs_table1.json</span></pre>
-                                                </div>
                                             </div>
                                             <div class="spec-intel-card-footer">
-                                                <button type="button" class="spec-intel-btn spec-intel-btn-outline spec-intel-btn-placeholder" id="specIntelExportJsonBtn" data-placeholder="true">Export JSON</button>
-                                                <button type="button" class="spec-intel-btn spec-intel-btn-primary spec-intel-btn-placeholder" id="specIntelSendToTsgBtn" data-placeholder="true">Send to Test Script Generator →</button>
+                                                <button type="button" class="spec-intel-btn spec-intel-btn-primary" id="specIntelSendToTsgBtn">Send to Test Script Generator →</button>
                                             </div>
                                             <div class="spec-intel-open-dataset" id="openDatasetButtonContainer" style="display: none;">
                                                 <button type="button" class="spec-intel-btn spec-intel-btn-outline" id="openDatasetBtn">Open dataset folder</button>
                                             </div>
-                                            <button type="button" class="spec-intel-btn spec-intel-btn-icon spec-intel-btn-outline spec-intel-nav-next" id="datasetGeneratorNextBtn" title="Next — Test Script Generator" aria-label="Next">→</button>
                                         </div>
                                     </div>
                                 </div>
+
+                                <nav class="spec-intel-page-nav pipeline-page-nav" aria-label="Pipeline navigation">
+                                    <span class="pipeline-page-nav-spacer" aria-hidden="true"></span>
+                                    <button type="button" class="spec-intel-btn spec-intel-btn-icon spec-intel-btn-outline" id="datasetGeneratorNextBtn" title="Next — Test Script Generator" aria-label="Next">→</button>
+                                </nav>
                             </div>
                         </div>
             
@@ -536,26 +543,20 @@
                                             <svg class="te-btn-icon-svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
                                             <span class="te-btn-label">Start Execution</span>
                                         </button>
-                                        <button type="button" class="te-btn te-btn-secondary" id="teViewHistoryBtn">View History</button>
-                                        <button type="button" class="te-btn te-btn-secondary" id="teRerunBtn" disabled title="Static — coming soon">
-                                            <svg class="te-btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                                            Re-run
-                                        </button>
-                                        <button type="button" class="te-btn te-btn-secondary" disabled title="Static — coming soon">New Run</button>
+                                        <button type="button" class="te-btn te-btn-secondary" id="teViewHistoryBtn">Stop Execution</button>
                                     </div>
                                 </header>
 
                                 <section class="te-meta-bar" aria-label="Run summary">
                                     <div class="te-meta-item"><span class="te-meta-key">RUN</span><span class="te-meta-val" id="teMetaRun">#0</span></div>
                                     <div class="te-meta-divider" aria-hidden="true"></div>
-                                    <div class="te-meta-item"><span class="te-meta-key">TRIGGERED BY</span><span class="te-meta-val">Jenkins — CI commit a3f91bc</span></div>
+                                    <div class="te-meta-item"><span class="te-meta-key">TRIGGERED BY</span><span class="te-meta-val">Jenkins</span></div>
                                     <div class="te-meta-divider" aria-hidden="true"></div>
-                                    <div class="te-meta-item"><span class="te-meta-key">GNB BUILD</span><span class="te-meta-val">OAI develop@46b76706</span></div>
+                                    <div class="te-meta-item"><span class="te-meta-key">GNB BUILD</span><span class="te-meta-val">OpenAirIntereface</span></div>
                                     <div class="te-meta-divider" aria-hidden="true"></div>
                                     <div class="te-meta-item"><span class="te-meta-key">DURATION</span><span class="te-meta-val" id="teMetaDuration">—</span></div>
                                     <div class="te-meta-divider" aria-hidden="true"></div>
                                     <div class="te-meta-item"><span class="te-meta-key">RESULT</span><span class="te-meta-val te-meta-val--fail" id="teMetaResult">Pending</span></div>
-                                    <button type="button" class="te-btn te-btn-outline te-btn-sm te-meta-compare" disabled>Compare Run #4</button>
                                 </section>
 
                                 <section class="te-metrics" aria-label="Execution metrics">
@@ -575,13 +576,13 @@
                                         <h2 class="te-metric-label">FAILED</h2>
                                         <p class="te-metric-value te-metric-value--red" id="teKpiFailed">0</p>
                                         <div class="te-metric-bar te-metric-bar--red"></div>
-                                        <p class="te-metric-meta" id="teKpiFailedMeta">0 real defects · 0 env</p>
+                                        <p class="te-metric-meta" id="teKpiFailedMeta">0% failure rate</p>
                                     </article>
                                     <article class="te-metric-card">
-                                        <h2 class="te-metric-label">SELF-HEALED</h2>
-                                        <p class="te-metric-value te-metric-value--cyan" id="teKpiSelfHealed">0</p>
+                                        <h2 class="te-metric-label">Execution status</h2>
+                                        <p class="te-metric-value te-metric-value--cyan" id="teKpiSelfHealed">PENDING</p>
                                         <div class="te-metric-bar te-metric-bar--cyan"></div>
-                                        <p class="te-metric-meta">Auto-recovered</p>
+                                        <p class="te-metric-meta" id="teKpiExecutionStatusMeta">No run yet</p>
                                     </article>
                                 </section>
 
@@ -602,7 +603,6 @@
                                                     <span class="te-pipeline-star" aria-hidden="true"></span>
                                                     <div>
                                                         <p class="te-pipeline-name">Jenkins Pipeline</p>
-                                                        <p class="te-pipeline-meta">ci.tcs-lab.internal · commit a3f91bc · main</p>
                                                     </div>
                                                     <span class="te-badge te-badge--active">Active</span>
                                                 </div>
@@ -650,10 +650,10 @@
                                             </span>
                                             <div>
                                                 <h2 class="te-results-title">Test Results — <span id="teResultsRunLabel">Run #0</span></h2>
-                                                <p class="te-results-subtitle">0 tests · 0 pass · 0 fail · 0 healed</p>
+                                                <p class="te-results-subtitle" id="teResultsSubtitle">0 tests · 0 pass · 0 fail</p>
                                             </div>
                                         </div>
-                                        <button type="button" class="te-btn te-btn-primary te-btn-sm" disabled>Analyse Failures →</button>
+                                        <button type="button" class="te-btn te-btn-primary te-btn-sm" id="teAnalyseFailuresBtn">Analyse Failures →</button>
                                     </div>
                                     <div class="te-results-table-wrap">
                                         <table class="te-results-table">
@@ -662,8 +662,6 @@
                                                     <th>TEST CASE</th>
                                                     <th>LAYER</th>
                                                     <th>RESULT</th>
-                                                    <th>METRIC</th>
-                                                    <th>NOTE</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -671,8 +669,6 @@
                                                     <td>—</td>
                                                     <td>—</td>
                                                     <td><span class="te-badge te-badge--muted">Pending</span></td>
-                                                    <td>—</td>
-                                                    <td>Results will populate after execution completes</td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -681,7 +677,6 @@
 
                                 <nav class="te-page-nav" aria-label="Pipeline navigation">
                                     <button type="button" class="te-btn te-btn-icon te-btn-outline" id="testExecutionPrevBtn" title="Previous — Test Deployment" aria-label="Previous">←</button>
-                                    <button type="button" class="te-btn te-btn-icon te-btn-outline" id="testExecutionNextBtn" title="Next — Bug Discovery" aria-label="Next">→</button>
                                 </nav>
 
                                 <span id="executionProgressBar" style="display: none;" aria-hidden="true">0%</span>
@@ -695,56 +690,29 @@
                                     <div class="bd-page-header-text">
                                         <p class="bd-breadcrumb">Analysis &gt; Bug Discovery &amp; RCA</p>
                                         <h1 class="bd-page-title">Bug Discovery &amp; Root Cause Analysis</h1>
-                                        <p class="bd-page-subtitle" id="bdPageSubtitle">Run #0 · <span id="bdSubtitleFailures">0</span> failures · <span id="bdSubtitleDefects">0</span> real defects · <span id="bdSubtitleEnv">0</span> env issues · <span id="bdSubtitlePatches">0</span> patches generated</p>
                                     </div>
                                 </header>
-
-                                <section class="bd-meta-bar" aria-label="Run summary">
-                                    <div class="bd-meta-item"><span class="bd-meta-key">RUN</span><span class="bd-meta-val" id="bdMetaRun">#0</span></div>
-                                    <div class="bd-meta-divider" aria-hidden="true"></div>
-                                    <div class="bd-meta-item"><span class="bd-meta-key">SOURCE</span><span class="bd-meta-val">OAI develop@46b76706</span></div>
-                                    <div class="bd-meta-divider" aria-hidden="true"></div>
-                                    <div class="bd-meta-item"><span class="bd-meta-key">FAILURES</span><span class="bd-meta-val bd-meta-val--red" id="bdMetaFailures">0</span></div>
-                                    <div class="bd-meta-divider" aria-hidden="true"></div>
-                                    <div class="bd-meta-item"><span class="bd-meta-key">REAL DEFECTS</span><span class="bd-meta-val bd-meta-val--red" id="bdMetaDefects">0</span></div>
-                                    <div class="bd-meta-divider" aria-hidden="true"></div>
-                                    <div class="bd-meta-item"><span class="bd-meta-key">ENV / FLAKY</span><span class="bd-meta-val bd-meta-val--orange" id="bdMetaEnv">0</span></div>
-                                    <div class="bd-meta-divider" aria-hidden="true"></div>
-                                    <div class="bd-meta-item"><span class="bd-meta-key">PATCHES</span><span class="bd-meta-val bd-meta-val--green" id="bdMetaPatches">0 generated</span></div>
-                                    <div class="bd-export-wrap portal-select-dropdown dropdown" id="bdExportRcaDropdown">
-                                        <input type="hidden" id="bdExportRcaFormat" value="">
-                                        <button type="button" class="bd-btn bd-btn-secondary bd-btn-sm bd-meta-export" id="bdExportRcaReportBtn" disabled title="Run RCA analysis first">Export RCA Report <span class="dropdown-arrow" aria-hidden="true">▼</span></button>
-                                        <div class="dropdown-content" id="bdExportRcaReportMenu">
-                                            <div class="dropdown-item" data-value="json">Download as JSON (.json)</div>
-                                            <div class="dropdown-item" data-value="txt">Download as TXT (.txt)</div>
-                                        </div>
-                                    </div>
-                                </section>
 
                                 <section class="bd-metrics" aria-label="RCA metrics">
                                     <article class="bd-metric-card">
                                         <h2 class="bd-metric-label">TOTAL FAILURES</h2>
                                         <p class="bd-metric-value" id="bdKpiFailures">0</p>
-                                        <div class="bd-metric-bar bd-metric-bar--red"></div>
-                                        <p class="bd-metric-meta" id="bdKpiFailuresMeta">of 0 run</p>
-                                    </article>
-                                    <article class="bd-metric-card">
-                                        <h2 class="bd-metric-label">RCA COVERAGE</h2>
-                                        <p class="bd-metric-value bd-metric-value--green" id="bdKpiCoverage">0%</p>
-                                        <div class="bd-metric-bar bd-metric-bar--green"></div>
-                                        <p class="bd-metric-meta" id="bdKpiCoverageMeta">0/0 analysed</p>
+                                        <div class="bd-metric-bar bd-metric-bar--red" aria-hidden="true"></div>
                                     </article>
                                     <article class="bd-metric-card">
                                         <h2 class="bd-metric-label">REAL DEFECTS</h2>
-                                        <p class="bd-metric-value bd-metric-value--red" id="bdKpiDefects">0</p>
-                                        <div class="bd-metric-bar bd-metric-bar--red"></div>
-                                        <p class="bd-metric-meta">Filed to Jira</p>
+                                        <p class="bd-metric-value" id="bdKpiDefects">0</p>
+                                        <div class="bd-metric-bar bd-metric-bar--red" aria-hidden="true"></div>
                                     </article>
                                     <article class="bd-metric-card">
                                         <h2 class="bd-metric-label">ENV / FLAKY</h2>
-                                        <p class="bd-metric-value bd-metric-value--orange" id="bdKpiEnv">0</p>
-                                        <div class="bd-metric-bar bd-metric-bar--orange"></div>
-                                        <p class="bd-metric-meta">Not real defects</p>
+                                        <p class="bd-metric-value" id="bdKpiEnv">0</p>
+                                        <div class="bd-metric-bar bd-metric-bar--orange" aria-hidden="true"></div>
+                                    </article>
+                                    <article class="bd-metric-card">
+                                        <h2 class="bd-metric-label">PATCHES GENERATED</h2>
+                                        <p class="bd-metric-value" id="bdKpiPatches">0</p>
+                                        <div class="bd-metric-bar bd-metric-bar--green" aria-hidden="true"></div>
                                     </article>
                                 </section>
 
@@ -824,7 +792,7 @@
                                                 </div>
                                             </div>
                                             <div style="display: flex; align-items: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
-                                                <button id="bugDiscoveryLoadPrevBtn" class="template-btn save-btn" style="padding: 0.55rem 1.6rem; font-size: 0.95rem; min-width: 150px; background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;">Load Previous Run</button>
+                                                <button id="bugDiscoveryLoadPrevBtn" class="template-btn save-btn" style="padding: 0.55rem 1.6rem; font-size: 0.95rem; min-width: 150px;">Load Previous Run</button>
                                                 <button id="bugDiscoveryRefreshBtn" class="template-btn" style="min-width:40px; font-size: 1.1rem; padding: 0.55rem 0.8rem;" title="Refresh" aria-label="Refresh">Refresh</button>
                                             </div>
                                         </div>
@@ -876,6 +844,14 @@
                                     <div class="bd-rca-actions">
                                         <button type="button" id="startBugRCAButton" class="bd-btn bd-btn-rca">Start RCA Analysis</button>
                                         <button type="button" id="deploymentSettingsBtn" class="bd-btn bd-btn-secondary" title="Configure deployment context values for RCA analysis">Deployment Settings</button>
+                                        <div class="bd-export-wrap portal-select-dropdown dropdown" id="bdExportRcaDropdown">
+                                            <input type="hidden" id="bdExportRcaFormat" value="">
+                                            <button type="button" class="bd-btn bd-btn-secondary bd-btn-sm" id="bdExportRcaReportBtn" disabled title="Run RCA analysis first">Export RCA Report <span class="dropdown-arrow" aria-hidden="true">▼</span></button>
+                                            <div class="dropdown-content" id="bdExportRcaReportMenu">
+                                                <div class="dropdown-item" data-value="json">Download as JSON (.json)</div>
+                                                <div class="dropdown-item" data-value="txt">Download as TXT (.txt)</div>
+                                            </div>
+                                        </div>
                                         <button type="button" id="bugFixPresentBtn" class="bd-btn bd-btn-success" style="display: none;">Fix Already Present - Click to View</button>
                                     </div>
                                     </div>
@@ -977,26 +953,6 @@
                                                         </span>
                                                     </label>
                                                     </div>
-                                                    <label class="bd-timeline-radio-option bd-analysis-radio-crash" style="display: none;">
-                                                        <span class="bd-timeline-radio-marker">
-                                                            <input type="radio" name="bdAnalysisRadio" value="crash-details" class="bd-analysis-radio" />
-                                                            <span class="bd-timeline-radio-dot" aria-hidden="true"></span>
-                                                        </span>
-                                                        <span class="bd-timeline-radio-content">
-                                                            <span class="bd-timeline-radio-title">Crash Details</span>
-                                                            <span class="bd-timeline-radio-desc">Crash analysis summary and context</span>
-                                                        </span>
-                                                    </label>
-                                                    <label class="bd-timeline-radio-option bd-analysis-radio-crash" style="display: none;">
-                                                        <span class="bd-timeline-radio-marker">
-                                                            <input type="radio" name="bdAnalysisRadio" value="backtrace" class="bd-analysis-radio" />
-                                                            <span class="bd-timeline-radio-dot" aria-hidden="true"></span>
-                                                        </span>
-                                                        <span class="bd-timeline-radio-content">
-                                                            <span class="bd-timeline-radio-title">Backtrace</span>
-                                                            <span class="bd-timeline-radio-desc">Stack trace from crash analysis</span>
-                                                        </span>
-                                                    </label>
                                                 </div>
                                             </div>
                                         </div>
@@ -1093,7 +1049,6 @@
                                         <div class="tsg-dataset-card-body">
                                             <div class="tsg-dataset-row">
                                                 <div class="tsg-dataset-label">
-                                                    <span class="material-icons" aria-hidden="true">&#128228;</span>
                                                     <span>Dataset Files</span>
                                                 </div>
                                                 <div class="tsg-dataset-info">
@@ -1102,6 +1057,7 @@
                                                 </div>
                                                 <div class="tsg-dataset-action">
                                                     <button id="loadTestDatasetBtn" class="tsg-btn tsg-btn-outline tsg-btn-sm" type="button">Load</button>
+                                                    <button id="resetTestDatasetBtn" class="tsg-btn tsg-btn-outline tsg-btn-sm" type="button">Reset</button>
                                                 </div>
                                             </div>
                                         </div>
@@ -1356,18 +1312,19 @@
                                             <button type="button" class="tsg-btn tsg-btn-outline" id="openTestCaseBtn">Open Test Case</button>
                                             <button type="button" class="tsg-btn tsg-btn-outline" id="openTestScriptBtn">Open Test Script</button>
                                             <button type="button" class="tsg-btn tsg-btn-outline tsg-btn--success" id="testSaveResponseBtn">Save</button>
-                                            <button type="button" class="tsg-btn tsg-btn-primary tsg-btn--push-end" id="testScriptGeneratorNextBtn">Send to Deployment →</button>
                                         </div>
                                         <div class="tsg-refine-section">
                                             <label class="tsg-field-label">New Prompt</label>
                                             <textarea id="testNewPromptEditor" class="tsg-refine-editor" placeholder="Enter a new prompt to refine the script..."></textarea>
                                             <button type="button" class="tsg-btn tsg-btn-outline" id="testRefineBtn">Generate with New Prompt</button>
                                         </div>
-                                        <div class="tsg-nav-row">
-                                            <button type="button" class="tsg-btn tsg-btn-icon tsg-btn-outline" id="testScriptGeneratorPrevBtn" title="Previous — Specification Intelligence" aria-label="Previous">←</button>
-                                        </div>
                                     </div>
                                 </section>
+
+                                <nav class="tsg-page-nav pipeline-page-nav" aria-label="Pipeline navigation">
+                                    <button type="button" class="tsg-btn tsg-btn-icon tsg-btn-outline" id="testScriptGeneratorPrevBtn" title="Previous — Specification Intelligence" aria-label="Previous">←</button>
+                                    <button type="button" class="tsg-btn tsg-btn-icon tsg-btn-outline" id="testScriptGeneratorNavNextBtn" title="Next — Test Deployment" aria-label="Next">→</button>
+                                </nav>
                             </div>
                         </div>
 
@@ -1419,47 +1376,142 @@
                                         </div>
                                         <div class="td-card-body">
                                             <section class="td-section">
-                                                <h3 class="td-section-label">Config Files</h3>
-                                                <div class="td-config-box td-config-box--empty" id="deploymentConfigBox">
-                                                    <p class="td-config-files-text" id="deploymentConfigStatus">No config files loaded</p>
-                                                    <span class="td-badge td-badge--muted" id="deploymentConfigBadge">0 files loaded</span>
-                                                    <div id="deploymentConfigFileList" class="td-config-file-list" style="display: none;" aria-hidden="true"></div>
+                                                <h3 class="td-section-label">Topology</h3>
+                                                <div class="td-topology-wrap">
+                                                    <div class="td-topology-radio-group" role="radiogroup" aria-label="Topology">
+                                                        <label class="td-topology-radio-option" for="tdTopology5g">
+                                                            <input type="radio" id="tdTopology5g" name="tdTopologyOption" value="5g" class="td-topology-radio" />
+                                                            <span class="td-topology-radio-title">5G_standalone_split8_with_OAI UE</span>
+                                                        </label>
+                                                        <label class="td-topology-radio-option" for="tdTopologySimulator">
+                                                            <input type="radio" id="tdTopologySimulator" name="tdTopologyOption" value="simulator" class="td-topology-radio" />
+                                                            <span class="td-topology-radio-title">5G_standalone_split8_with_simunous UE</span>
+                                                        </label>
+                                                    </div>
+                                                    <input type="hidden" id="tdTopologyValue" value="all" />
                                                 </div>
-                                                <button type="button" class="td-btn td-btn-outline td-btn-block" id="loadDeploymentConfigBtn">Load Config Files</button>
+                                            </section>
+
+                                            <section class="td-section" id="tdTopologyVisualSection">
+                                                <div class="td-topology-visual" id="tdTopologyVisual">
+                                                    <div class="td-topology-flow">
+                                                        <div class="td-topology-node td-topology-node--ue">
+                                                            <span class="td-topology-node-tag" id="tdTopologyNodeTag">OAI</span>
+                                                            <span>UE</span>
+                                                        </div>
+                                                        <div class="td-topology-connector">
+                                                            <div class="td-topology-arrow">→</div>
+                                                            <div class="td-topology-mid-link" id="tdTopologyVisualLink">RF Simulator</div>
+                                                        </div>
+                                                        <div class="td-topology-node td-topology-node--du">DU</div>
+                                                        <div class="td-topology-arrow">→</div>
+                                                        <div class="td-topology-node td-topology-node--cu">CU</div>
+                                                        <div class="td-topology-arrow">→</div>
+                                                        <div class="td-topology-node td-topology-node--cn">CN</div>
+                                                    </div>
+                                                </div>
+                                            </section>
+
+                                            <section class="td-section" id="tdTopologyParamsSection">
+                                                <div class="td-params-grid">
+                                                    <div class="td-param-box">
+                                                        <label class="td-param-title" for="tdParamBand">AbsoluteFrequencySSB</label>
+                                                        <input id="tdParamBand" type="text" class="td-param-input" value="641280" />
+                                                    </div>
+                                                    <div class="td-param-box">
+                                                        <label class="td-param-title" for="tdParamPrbs">FrequencyBand</label>
+                                                        <input id="tdParamPrbs" type="text" class="td-param-input" value="78" />
+                                                    </div>
+                                                    <div class="td-param-box td-param-box--scs">
+                                                        <label class="td-param-title" for="tdSubcarrierSpacingBtn">SubcarrierSpacing</label>
+                                                        <div class="dropdown portal-select-dropdown td-scs-dropdown" id="tdSubcarrierSpacingDropdown">
+                                                            <button type="button" class="dropdown-btn td-param-dropdown-btn" id="tdSubcarrierSpacingBtn">
+                                                                <span class="td-param-dropdown-label" id="tdSubcarrierSpacingBtnLabel">1(KHz30)</span>
+                                                                <span class="dropdown-arrow" aria-hidden="true">▼</span>
+                                                            </button>
+                                                            <div class="dropdown-content" id="tdSubcarrierSpacingDropdownMenu">
+                                                                <div class="dropdown-item" data-value="0">0(kHz15)</div>
+                                                                <div class="dropdown-item is-selected" data-value="1">1(KHz30)</div>
+                                                                <div class="dropdown-item" data-value="2">2(kHz60)</div>
+                                                                <div class="dropdown-item" data-value="3">3(kHz120)</div>
+                                                            </div>
+                                                        </div>
+                                                        <input type="hidden" id="tdParamDistance" value="1" />
+                                                    </div>
+                                                    <div class="td-param-box td-param-box--logging">
+                                                        <label class="td-param-title" for="tdLoggingLevelSummary">Logging level</label>
+                                                        <details class="td-loglevel-details">
+                                                            <summary id="tdLoggingLevelSummary" class="td-loglevel-summary">Configure log levels</summary>
+                                                            <div class="td-loglevel-panel">
+                                                                <div class="td-loglevel-row">
+                                                                    <span>RRC log level</span>
+                                                                    <div class="td-loglevel-picker dropdown portal-select-dropdown td-loglevel-layer-dropdown">
+                                                                        <button type="button" class="dropdown-btn td-loglevel-picker-btn ce-log-type-dropdown-btn">
+                                                                            <span class="ce-dropdown-btn-label td-loglevel-picker-value">debug</span>
+                                                                            <span class="dropdown-arrow" aria-hidden="true">▼</span>
+                                                                        </button>
+                                                                        <div class="td-loglevel-submenu">
+                                                                            <button type="button" class="td-loglevel-subitem is-selected" data-value="debug">Debug</button>
+                                                                            <button type="button" class="td-loglevel-subitem" data-value="info">Info</button>
+                                                                            <button type="button" class="td-loglevel-subitem" data-value="warning">Warning</button>
+                                                                            <button type="button" class="td-loglevel-subitem" data-value="error">Error</button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="td-loglevel-row">
+                                                                    <span>RLC log level</span>
+                                                                    <div class="td-loglevel-picker dropdown portal-select-dropdown td-loglevel-layer-dropdown">
+                                                                        <button type="button" class="dropdown-btn td-loglevel-picker-btn ce-log-type-dropdown-btn">
+                                                                            <span class="ce-dropdown-btn-label td-loglevel-picker-value">debug</span>
+                                                                            <span class="dropdown-arrow" aria-hidden="true">▼</span>
+                                                                        </button>
+                                                                        <div class="td-loglevel-submenu">
+                                                                            <button type="button" class="td-loglevel-subitem is-selected" data-value="debug">Debug</button>
+                                                                            <button type="button" class="td-loglevel-subitem" data-value="info">Info</button>
+                                                                            <button type="button" class="td-loglevel-subitem" data-value="warning">Warning</button>
+                                                                            <button type="button" class="td-loglevel-subitem" data-value="error">Error</button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="td-loglevel-row">
+                                                                    <span>MAC log level</span>
+                                                                    <div class="td-loglevel-picker dropdown portal-select-dropdown td-loglevel-layer-dropdown">
+                                                                        <button type="button" class="dropdown-btn td-loglevel-picker-btn ce-log-type-dropdown-btn">
+                                                                            <span class="ce-dropdown-btn-label td-loglevel-picker-value">debug</span>
+                                                                            <span class="dropdown-arrow" aria-hidden="true">▼</span>
+                                                                        </button>
+                                                                        <div class="td-loglevel-submenu">
+                                                                            <button type="button" class="td-loglevel-subitem is-selected" data-value="debug">Debug</button>
+                                                                            <button type="button" class="td-loglevel-subitem" data-value="info">Info</button>
+                                                                            <button type="button" class="td-loglevel-subitem" data-value="warning">Warning</button>
+                                                                            <button type="button" class="td-loglevel-subitem" data-value="error">Error</button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="td-loglevel-row">
+                                                                    <span>PDCP log level</span>
+                                                                    <div class="td-loglevel-picker dropdown portal-select-dropdown td-loglevel-layer-dropdown">
+                                                                        <button type="button" class="dropdown-btn td-loglevel-picker-btn ce-log-type-dropdown-btn">
+                                                                            <span class="ce-dropdown-btn-label td-loglevel-picker-value">debug</span>
+                                                                            <span class="dropdown-arrow" aria-hidden="true">▼</span>
+                                                                        </button>
+                                                                        <div class="td-loglevel-submenu">
+                                                                            <button type="button" class="td-loglevel-subitem is-selected" data-value="debug">Debug</button>
+                                                                            <button type="button" class="td-loglevel-subitem" data-value="info">Info</button>
+                                                                            <button type="button" class="td-loglevel-subitem" data-value="warning">Warning</button>
+                                                                            <button type="button" class="td-loglevel-subitem" data-value="error">Error</button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </details>
+                                                    </div>
+                                                </div>
                                             </section>
 
                                             <section class="td-section">
-                                                <h3 class="td-section-label">Target Nodes</h3>
-                                                <div class="td-node-list">
-                                                    <div class="td-node-row">
-                                                        <div class="td-node-icon" aria-hidden="true">
-                                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
-                                                        </div>
-                                                        <div class="td-node-info">
-                                                            <span class="td-node-name">gNB Node</span>
-                                                            <span class="td-node-ip">192.168.1.10</span>
-                                                            <span class="td-node-desc">OAI gNB · nr-softmodem</span>
-                                                        </div>
-                                                        <span class="td-badge td-badge--pending">Pending</span>
-                                                    </div>
-                                                    <div class="td-node-row">
-                                                        <div class="td-node-icon td-node-icon--ue" aria-hidden="true">
-                                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
-                                                        </div>
-                                                        <div class="td-node-info">
-                                                            <span class="td-node-name">UE Node</span>
-                                                            <span class="td-node-ip">192.168.1.20</span>
-                                                            <span class="td-node-desc">OAI UE · nr-uesoftmodem</span>
-                                                        </div>
-                                                        <span class="td-badge td-badge--pending">Pending</span>
-                                                    </div>
-                                                </div>
+                                                <button type="button" class="td-btn td-btn-primary td-btn-block" id="deployBtn">Deploy</button>
                                             </section>
-
-                                            <button type="button" class="td-btn td-btn-primary td-btn-block td-btn-deploy" id="deployBtn">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-                                                Deploy
-                                            </button>
                                         </div>
                                     </div>
 
@@ -1487,8 +1539,9 @@
                                     </div>
                                 </div>
 
-                                <nav class="td-page-nav" aria-label="Pipeline navigation">
+                                <nav class="td-page-nav pipeline-page-nav" aria-label="Pipeline navigation">
                                     <button type="button" class="td-btn td-btn-icon td-btn-outline" id="testDeploymentPrevBtn" title="Previous — Test Script Generator" aria-label="Previous">←</button>
+                                    <button type="button" class="td-btn td-btn-icon td-btn-outline" id="testDeploymentNavNextBtn" title="Next — Test Execution" aria-label="Next">→</button>
                                 </nav>
 
                                 <!-- Hidden elements for backend functionality -->
@@ -1554,8 +1607,8 @@
                                                 </div>
                                             </div>
                                             <div class="ca-load-actions">
-                                                <button type="button" id="caLoadAnalysisBtn" class="bd-btn bd-btn-secondary">Load Analysis</button>
-                                                <button type="button" id="caRefreshAnalysisBtn" class="bd-btn bd-btn-secondary bd-btn-icon" title="Refresh history" aria-label="Refresh">Refresh</button>
+                                                <button type="button" id="caLoadAnalysisBtn" class="bd-btn ca-btn-primary">Load Analysis</button>
+                                                <button type="button" id="caRefreshAnalysisBtn" class="bd-btn ca-btn-primary" title="Refresh history" aria-label="Refresh">Refresh</button>
                                             </div>
                                         </div>
                                     </div>
@@ -1590,8 +1643,8 @@
                                         </div>
                                     </div>
                                     <div class="bd-panel-body ca-patch-actions">
-                                        <button type="button" id="caSelectAllBtn" class="bd-btn bd-btn-secondary ca-btn-sm">Select All</button>
-                                        <button type="button" id="caUnselectAllBtn" class="bd-btn bd-btn-secondary ca-btn-sm">Unselect All</button>
+                                        <button type="button" id="caSelectAllBtn" class="bd-btn ca-btn-primary ca-btn-sm">Select All</button>
+                                        <button type="button" id="caUnselectAllBtn" class="bd-btn ca-btn-primary ca-btn-sm">Unselect All</button>
                                     </div>
                                 </section>
 
@@ -1599,8 +1652,8 @@
                                     <h2 class="bd-panel-title">Actions</h2>
                                     <div class="bd-panel-body ca-actions-body">
                                         <div class="ca-actions-row">
-                                            <button type="button" id="caApplyPatchesBtn" class="bd-btn bd-btn-rca ca-btn-action">Apply Patch Fixes</button>
-                                            <button type="button" id="caRunInvestigationBtn" class="bd-btn bd-btn-rca ca-btn-action">Run Investigation Commands</button>
+                                            <button type="button" id="caApplyPatchesBtn" class="bd-btn ca-btn-primary ca-btn-action">Apply Patch Fixes</button>
+                                            <button type="button" id="caRunInvestigationBtn" class="bd-btn ca-btn-primary ca-btn-action">Run Investigation Commands</button>
                                         </div>
                                         <h3 class="ca-subtitle ca-output-heading">Investigation Commands Output</h3>
                                         <textarea id="caInvestigationOutput" class="ca-textarea ca-output-textarea" readonly placeholder="Output from investigation commands will appear here..."></textarea>
@@ -1698,32 +1751,75 @@
                                     </div>
                                 </section>
 
-                                <section class="bd-panel" id="ceTestOptionsSection">
-                                    <h2 class="bd-panel-title">Test Options</h2>
-                                    <div class="bd-panel-body ce-test-options-body">
-                                        <p class="ce-hint">Select which validation layers to execute during code evaluation.</p>
-                                        <div id="ceLayerCheckboxes" class="ce-layer-list">
-                                            <label class="ce-layer-option">
-                                                <input type="checkbox" id="ceLayer1" checked>
-                                                <span>Layer 1: Syntax &amp; Structural Validation</span>
-                                            </label>
-                                            <label class="ce-layer-option">
-                                                <input type="checkbox" id="ceLayer2" checked>
-                                                <span>Layer 2: 3GPP Spec Reference Analysis</span>
-                                            </label>
-                                            <label class="ce-layer-option">
-                                                <input type="checkbox" id="ceLayer3" checked>
-                                                <span>Layer 3: LLM as Judge</span>
-                                            </label>
-                                            <label class="ce-layer-option">
-                                                <input type="checkbox" id="ceLayer4" checked>
-                                                <span>Layer 4: Variable Impact Analysis</span>
-                                            </label>
-                                        </div>
-                                        <div class="ce-actions-row">
-                                            <button type="button" id="ceRunTestsBtn" class="bd-btn bd-btn-rca ce-btn-action">Run Selected Tests</button>
-                                            <button type="button" id="ceClearOutputBtn" class="bd-btn bd-btn-rca ce-btn-action">Clear Output</button>
-                                        </div>
+                                <section class="ce-submit-review-row" id="ceSubmitReviewSection" aria-label="Submit code for review and review criteria">
+                                    <div class="ce-submit-review-grid">
+                                        <article class="ce-review-card ce-review-card--submit">
+                                            <header class="ce-review-card__head">
+                                                <span class="ce-review-card__icon" aria-hidden="true">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+                                                </span>
+                                                <h2 class="ce-review-card__title">Submit Code for Review</h2>
+                                            </header>
+                                            <div class="ce-review-card__body">
+                                                <div class="ce-review-fields">
+                                                    <div class="ce-review-field">
+                                                        <label class="ce-review-field-label" for="ceReviewTypeBtn">REVIEW TYPE</label>
+                                                        <div class="dropdown ce-review-type-dropdown" id="ceReviewTypeDropdown">
+                                                            <button class="dropdown-btn ce-review-field-control" id="ceReviewTypeBtn" type="button">
+                                                                <span id="ceReviewTypeBtnLabel">Git Diff (branch vs main)</span>
+                                                                <span class="dropdown-arrow" aria-hidden="true">▼</span>
+                                                            </button>
+                                                            <div class="dropdown-content" id="ceReviewTypeDropdownMenu">
+                                                                <div class="dropdown-item" data-value="git-diff">Git Diff (branch vs main)</div>
+                                                                <div class="dropdown-item" data-value="upload-patch">Upload Patch File</div>
+                                                                <div class="dropdown-item" data-value="paste-code">Paste Code</div>
+                                                            </div>
+                                                        </div>
+                                                        <input type="hidden" id="ceReviewTypeFilter" value="git-diff">
+                                                    </div>
+                                                    <div class="ce-review-field">
+                                                        <label class="ce-review-field-label" for="ceBranchOrCommit">BRANCH OR COMMIT</label>
+                                                        <input type="text" id="ceBranchOrCommit" class="ce-review-field-control ce-review-text-input" value="main" autocomplete="off" spellcheck="false">
+                                                    </div>
+                                                </div>
+                                                <p class="ce-hint ce-hint--layers">Select which validation layers to execute during code evaluation.</p>
+                                                <div id="ceLayerCheckboxes" class="ce-layer-list">
+                                                    <label class="ce-layer-option">
+                                                        <input type="checkbox" id="ceLayer1" class="ce-layer-checkbox" data-layer="layer1" checked>
+                                                        <span>Layer 1: Syntax &amp; Structural Validation</span>
+                                                    </label>
+                                                    <label class="ce-layer-option">
+                                                        <input type="checkbox" id="ceLayer2" class="ce-layer-checkbox" data-layer="layer2" checked>
+                                                        <span>Layer 2: 3GPP Spec Reference Analysis</span>
+                                                    </label>
+                                                    <label class="ce-layer-option">
+                                                        <input type="checkbox" id="ceLayer3" class="ce-layer-checkbox" data-layer="layer3" checked>
+                                                        <span>Layer 3: LLM as Judge</span>
+                                                    </label>
+                                                    <label class="ce-layer-option">
+                                                        <input type="checkbox" id="ceLayer4" class="ce-layer-checkbox" data-layer="layer4" checked>
+                                                        <span>Layer 4: Variable Impact Analysis</span>
+                                                    </label>
+                                                </div>
+                                                <div class="ce-actions-row">
+                                                    <button type="button" id="ceRunTestsBtn" class="ce-btn-run-review">Run code review</button>
+                                                    <button type="button" id="ceClearOutputBtn" class="bd-btn bd-btn-secondary ce-btn-clear-output">Clear Output</button>
+                                                </div>
+                                            </div>
+                                        </article>
+                                        <article class="ce-review-card ce-review-card--criteria">
+                                            <header class="ce-review-card__head">
+                                                <span class="ce-review-card__icon ce-review-card__icon--check" aria-hidden="true">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                                                </span>
+                                                <h2 class="ce-review-card__title">Review Criteria</h2>
+                                            </header>
+                                            <div class="ce-review-card__body">
+                                                <div id="ceReviewCriteriaList" class="ce-criteria-list" aria-live="polite">
+                                                    <p class="ce-criteria-empty">Select test options on the left to see review criteria.</p>
+                                                </div>
+                                            </div>
+                                        </article>
                                     </div>
                                 </section>
 
@@ -1927,116 +2023,180 @@
                             </div>
                         </div>
 
-                        <!-- Prompt Templates Section -->
+                        <!-- Prompt Studio / Prompt Library -->
                         <div id="prompt-templates" class="content-section">
-                            <div class="prompt-templates-grid">
-                                <!-- Box 1: Select Role -->
-                                <div class="prompt-box">
-                                    <h3>Select Role</h3>
-                                    <div class="dropdown-container">
-                                        <div class="dropdown" id="roleDropdown">
-                                            <button class="dropdown-btn" id="roleBtn" type="button">
-                                                <span>Select Role</span>
-                                                <span class="dropdown-arrow">▼</span>
-                                            </button>
-                                            <div class="dropdown-content" id="dropdownContent">
-                                                <div class="dropdown-item" data-role="tester">Tester</div>
-                                                <div class="dropdown-item" data-role="developer">Developer</div>
-                                                <div class="dropdown-item" data-role="analyst">Analyst</div>
+                            <div class="prompt-studio-page">
+                                <header class="prompt-studio-header">
+                                    <div class="prompt-studio-header-text">
+                                        <p class="prompt-studio-breadcrumb">Prompt Studio</p>
+                                        <h1 class="prompt-studio-title">Prompt Library</h1>
+                                        <p class="prompt-studio-subtitle">Manage AI prompts for RCA, patch generation, code validation and test script generation.</p>
+                                    </div>
+                                    <button type="button" class="prompt-studio-new-btn" id="promptNewBtn">+ New Prompt</button>
+                                </header>
+
+                                <div class="prompt-studio-body">
+                                    <aside class="prompt-studio-sidebar">
+                                        <div class="prompt-studio-role-wrap">
+                                            <label class="prompt-studio-category-label" for="roleBtn">Select Category</label>
+                                            <div class="dropdown prompt-studio-role-dropdown" id="roleDropdown">
+                                                <button class="dropdown-btn prompt-studio-role-btn" id="roleBtn" type="button">
+                                                    <span class="prompt-studio-role-btn-icon" aria-hidden="true">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><circle cx="10.5" cy="14.5" r="2.5"/><path d="M12.5 16.5 15 19"/></svg>
+                                                    </span>
+                                                    <span class="prompt-studio-role-btn-text">Select Category</span>
+                                                    <span class="dropdown-arrow" aria-hidden="true">▼</span>
+                                                </button>
+                                                <div class="dropdown-content" id="dropdownContent">
+                                                    <div class="dropdown-item" data-role="tester">Tester</div>
+                                                    <div class="dropdown-item" data-role="developer">Developer</div>
+                                                    <div class="dropdown-item" data-role="analyst">Analyst</div>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </div>
-            
-                                <!-- Box 2: Template Categories -->
-                                <div class="prompt-box">
-                                    <h3>Template Categories</h3>
-                                    <div class="template-categories-area" id="templateCategoriesArea">
-                                        <!-- 6 mini boxes will be added here later -->
-                                        <p style="color: #666; text-align: center; margin-top: 2rem;font-size: 0.8rem;">Select a role to see template categories</p>
-                                    </div>
-                                </div>
-            
-                                <!-- Box 3: Template Content -->
-                                <div class="prompt-box template-content-box">
-                                    <div class="template-header">
-                                        <h3>Template Content</h3>
-                                        <div class="template-buttons">
-                                            <button class="template-btn modify-btn" id="promptModifyBtn" style="display: none;">Modify</button>
-                                            <button class="template-btn save-btn" id="promptSaveBtn" style="display: none;">Save</button>
+                                        <div class="prompt-studio-prompts-panel" id="promptPromptsPanel">
+                                            <div class="prompt-studio-prompts-head">
+                                                <h2 class="prompt-studio-prompts-title" id="promptPromptsPanelTitle">Prompts</h2>
+                                                <span class="prompt-studio-prompts-badge" id="promptPromptsCount">0 items</span>
+                                            </div>
+                                            <div class="prompt-studio-category-list" id="templateCategoriesArea">
+                                                <p class="prompt-studio-empty-hint">Select a category to see prompts</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="template-text-area" id="templateTextArea">
-                                        <p style="color: #666; text-align: center; margin-top: 2rem;">Select a template to view content</p>
-                                    </div>
-                                </div>
-                            </div>
-                    </div>
-            
-                        <!-- User History Section -->
-                        <div id="user-history" class="content-section">
-                            <div class="prompt-templates-grid">
-                                <!-- Box 1: Activity History -->
-                                <div class="prompt-box">
-                                    <h3>Activity History</h3>
-                                    <p style="color: #6b7280; margin-bottom: 2rem; text-align: center;">View and Manage your framework activities and analysis results.</p>
-                                    
-                                    <div style="display: flex; gap: 2rem; margin-bottom: 2rem; flex-wrap: wrap; align-items: flex-end;">
-                                        <!-- Left side - Filter dropdowns -->
-                                        <div style="flex: 1; min-width: 200px;">
-                                            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-                                                <!-- Time Period Dropdown -->
-                                                <div style="flex: 1; min-width: 150px;">
-                                                    <h4 style="color: #5d92ff; font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; text-align: center;">Time Period</h4>
-                                                    <div class="dropdown" id="timePeriodDropdown">
-                                                        <button class="dropdown-btn" id="timePeriodBtn" type="button">
-                                                            <span>All Dates</span>
-                                                            <span class="dropdown-arrow">▼</span>
-                        </button>
-                                                        <div class="dropdown-content">
-                                                            <div class="dropdown-item" data-period="all">All Dates</div>
-                                                            <div class="dropdown-item" data-period="today">Today</div>
-                                                            <div class="dropdown-item" data-period="7days">Last 7 Days</div>
-                                                            <div class="dropdown-item" data-period="30days">Last 30 Days</div>
-                                                        </div>
+                                        <p class="prompt-studio-library-label" id="promptLibraryCount" hidden aria-hidden="true">LIBRARY</p>
+                                    </aside>
+
+                                    <main class="prompt-studio-detail">
+                                        <div class="prompt-studio-detail-empty" id="promptDetailEmpty">
+                                            <p>Select a template category to view content</p>
+                                        </div>
+
+                                        <div class="prompt-studio-detail-panel" id="promptDetailPanel" hidden>
+                                            <div class="prompt-studio-detail-head">
+                                                <div class="prompt-studio-detail-title-row">
+                                                    <button type="button" class="prompt-studio-edit-icon" id="promptEditBtn" title="Edit template" aria-label="Edit template">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                                                    </button>
+                                                    <div>
+                                                        <h2 class="prompt-studio-detail-title" id="promptDetailTitle">Template</h2>
+                                                        <p class="prompt-studio-detail-meta" id="promptDetailMeta"></p>
                                                     </div>
                                                 </div>
-                                                
-                                                <!-- Activity Type Dropdown -->
-                                                <div style="flex: 1; min-width: 150px;">
-                                                    <h4 style="color: #5d92ff; font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; text-align: center;">Activity Type</h4>
-                                                    <div class="dropdown" id="activityTypeDropdown">
-                                                        <button class="dropdown-btn" id="activityTypeBtn" type="button">
-                                                            <span>All Activities</span>
-                                                            <span class="dropdown-arrow">▼</span>
-                        </button>
-                                                        <div class="dropdown-content">
-                                                            <div class="dropdown-item" data-type="all">All Activities</div>
-                                                            <div class="dropdown-item" data-type="test-script">Test Script Generation</div>
-                                                            <div class="dropdown-item" data-type="test-case">Test case Creation</div>
-                                                            <div class="dropdown-item" data-type="bug-analysis">Bug Analysis</div>
-                                                            <div class="dropdown-item" data-type="prompt-templates">Code Assistant</div>
-                    </div>
-                    </div>
+                                                <span class="prompt-studio-active-badge">Active</span>
+                                            </div>
+
+                                            <div class="prompt-studio-fields">
+                                                <label class="prompt-studio-field-label" for="promptSystemPrompt">SYSTEM PROMPT</label>
+                                                <textarea id="promptSystemPrompt" class="prompt-studio-textarea prompt-studio-textarea--lg" readonly placeholder="System instructions for the model…"></textarea>
+
+                                                <label class="prompt-studio-field-label" for="promptUserPrompt">USER PROMPT TEMPLATE</label>
+                                                <textarea id="promptUserPrompt" class="prompt-studio-textarea" readonly placeholder="User message template with placeholders…"></textarea>
+
+                                                <label class="prompt-studio-field-label" for="promptModelBtn">MODEL</label>
+                                                <div class="dropdown prompt-studio-model-dropdown" id="promptModelDropdown">
+                                                    <button type="button" class="dropdown-btn prompt-studio-model-btn" id="promptModelBtn" disabled>
+                                                        <span id="promptModelBtnLabel">claude-sonnet-4-6 (recommended)</span>
+                                                        <span class="dropdown-arrow" aria-hidden="true">▼</span>
+                                                    </button>
+                                                    <div class="dropdown-content" id="promptModelDropdownMenu">
+                                                        <div class="dropdown-item" data-value="claude-sonnet-4-6">claude-sonnet-4-6 (recommended)</div>
+                                                        <div class="dropdown-item" data-value="claude-3-7-sonnet">claude-3-7-sonnet</div>
+                                                        <div class="dropdown-item" data-value="gpt-4o">gpt-4o</div>
+                                                        <div class="dropdown-item" data-value="gpt-4o-mini">gpt-4o-mini</div>
+                                                    </div>
                                                 </div>
+                                                <input type="hidden" id="promptModelSelect" value="claude-sonnet-4-6">
+                                            </div>
+
+                                            <div class="prompt-studio-detail-actions">
+                                                <div class="prompt-studio-detail-actions-left">
+                                                    <button type="button" class="prompt-studio-btn prompt-studio-btn--primary" id="promptSaveBtn" style="display: none;">Save Prompt</button>
+                                                    <button type="button" class="prompt-studio-btn prompt-studio-btn--outline" id="promptTestBtn">Test Prompt</button>
+                                                </div>
+                                                <button type="button" class="prompt-studio-btn prompt-studio-btn--danger" id="promptDeleteBtn" style="display: none;">Delete</button>
                                             </div>
                                         </div>
-                                        
-                                        <!-- Right side - Action buttons -->
-                                        <div style="display: flex; gap: 1rem; align-items: center;">
-                                            <button class="template-btn modify-btn" id="clearBtn">Clear</button>
-        
+
+                                        <!-- Legacy hooks (not rendered in Prompt Studio layout) -->
+                                        <div class="template-text-area prompt-studio-legacy-hidden" id="templateTextArea" hidden aria-hidden="true"></div>
+                                        <button type="button" id="promptModifyBtn" class="prompt-studio-legacy-hidden" hidden aria-hidden="true"></button>
+                                    </main>
+                                </div>
+                            </div>
+                        </div>
+            
+                        <!-- Activity Log Section -->
+                        <div id="user-history" class="content-section">
+                            <div class="activity-log-page">
+                                <header class="activity-log-header">
+                                    <div class="activity-log-header-text">
+                                        <h1 class="activity-log-title">Activity Log</h1>
+                                        <p class="activity-log-subtitle" id="activityLogSubtitle">All platform events</p>
+                                    </div>
+                                    <div class="activity-log-header-actions">
+                                        <button type="button" class="activity-log-btn activity-log-btn--outline" id="exportHistoryBtn">Export CSV</button>
+                                        <button type="button" class="activity-log-btn activity-log-btn--outline" id="clearBtn">Clear</button>
+                                    </div>
+                                </header>
+
+                                <div class="activity-log-filters">
+                                    <div class="activity-log-filter">
+                                        <span class="activity-log-filter-label">FILTER</span>
+                                        <div class="dropdown activity-log-dropdown" id="activityTypeDropdown">
+                                            <button class="dropdown-btn activity-log-dropdown-btn" id="activityTypeBtn" type="button">
+                                                <span>All Activities</span>
+                                                <span class="dropdown-arrow">▼</span>
+                                            </button>
+                                            <div class="dropdown-content">
+                                                <div class="dropdown-item" data-type="all">All Activities</div>
+                                                <div class="dropdown-item" data-type="test-script">Test Script Generation</div>
+                                                <div class="dropdown-item" data-type="test-case">Test case Creation</div>
+                                                <div class="dropdown-item" data-type="bug-analysis">Bug Analysis</div>
+                                                <div class="dropdown-item" data-type="prompt-templates">Code Assistant</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="activity-log-filter">
+                                        <span class="activity-log-filter-label">DATE RANGE</span>
+                                        <div class="dropdown activity-log-dropdown" id="timePeriodDropdown">
+                                            <button class="dropdown-btn activity-log-dropdown-btn" id="timePeriodBtn" type="button">
+                                                <span>All Dates</span>
+                                                <span class="dropdown-arrow">▼</span>
+                                            </button>
+                                            <div class="dropdown-content">
+                                                <div class="dropdown-item" data-period="all">All Dates</div>
+                                                <div class="dropdown-item" data-period="today">Today</div>
+                                                <div class="dropdown-item" data-period="7days">Last 7 Days</div>
+                                                <div class="dropdown-item" data-period="30days">Last 30 Days</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-            
-                                <!-- Box 2: History Results -->
-                                <div class="prompt-box template-content-box">
-                                    <h3>History Results</h3>
-                                    <div class="template-text-area" id="historyResultsArea">
-                                        <p style="color: #6b7280; text-align: center; margin-top: 2rem; font-style: italic;">No history entries found.</p>
+
+                                <article class="activity-log-timeline-card">
+                                    <header class="activity-log-timeline-head">
+                                        <span class="activity-log-timeline-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+                                        </span>
+                                        <div>
+                                            <h2 class="activity-log-timeline-title" id="activityTimelineTitle">Event Timeline</h2>
+                                            <p class="activity-log-timeline-date" id="activityTimelineDate">—</p>
+                                        </div>
+                                    </header>
+                                    <div class="activity-log-timeline-list" id="activityTimelineList" aria-live="polite">
+                                        <p class="activity-log-empty">No history entries found.</p>
                                     </div>
-                                </div>
+                                </article>
+
+                                <section class="activity-log-detail-wrap" id="historyDetailWrap">
+                                    <div class="activity-log-detail-empty" id="historyDetailEmpty">
+                                        <p>Select an event above to view details</p>
+                                    </div>
+                                    <div class="activity-log-detail" id="historyDetailArea" hidden></div>
+                                </section>
+
+                                <!-- Legacy target kept for compatibility -->
+                                <div id="historyResultsArea" hidden aria-hidden="true"></div>
                             </div>
                         </div>
             
@@ -2103,7 +2263,7 @@
             </div>
             <div class="template-modal-footer" style="display: flex; justify-content: flex-end; gap: 1rem; padding: 1.5rem; border-top: 1px solid #e2e8f0; background-color: #f8f9fa; position: relative; z-index: 10003;">
                 <button class="template-modal-btn cancel" onclick="closeAddTemplateModal()" style="padding: 0.75rem 1.5rem; background-color: #8A8886; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; transition: all 0.3s; position: relative; z-index: 10004;">Cancel</button>
-                <button class="template-modal-btn save" id="confirmAddTemplate" style="padding: 0.75rem 1.5rem; background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 6px; cursor: pointer; font-weight: 500; transition: all 0.3s; position: relative; z-index: 10004;">Save</button>
+                <button class="template-modal-btn save" id="confirmAddTemplate" style="padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; font-weight: 600; position: relative; z-index: 10004;">Save</button>
             </div>
         </div>
     </div>
@@ -2158,7 +2318,7 @@
             </div>
             <div class="template-modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; border-top: 1px solid #e2e8f0; background-color: #f8f9fa; gap: 1rem;">
                 <button class="template-modal-btn cancel" onclick="closePatchSuccessModal()">Close</button>
-                <button class="template-modal-btn save" id="gitCommitPushBtn" style="background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-weight: bold;">Commit & Push</button>
+                <button class="template-modal-btn save" id="gitCommitPushBtn" style="font-weight: 600;">Commit & Push</button>
             </div>
         </div>
     </div>
@@ -2204,7 +2364,7 @@
     <div id="deploymentSettingsModal" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">
             <div class="modal-header">
-                <h2 style="margin: 0; color: #0078D4; font-size: 1.5rem;">Deployment Context Settings</h2>
+                <h2 style="margin: 0; color: #1f2937; font-size: 1.5rem;">Deployment Context Settings</h2>
                 <button id="closeDeploymentSettingsModal" class="close-btn" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">&times;</button>
             </div>
             <div class="modal-body">
@@ -2217,12 +2377,12 @@
             </div>
             <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; border-top: 1px solid #e2e8f0; background-color: #f8f9fa; gap: 1rem;">
                 <div style="display: flex; gap: 0.5rem;">
-                    <button id="clearDeploymentSettingsBtn" class="template-btn save-btn" style="background-color: #D13438; color: white; min-width: 140px; padding: 0.5rem 1rem;">Clear All (Use JSON)</button>
+                    <button id="clearDeploymentSettingsBtn" class="template-btn save-btn" style="min-width: 140px; padding: 0.5rem 1rem;">Clear All (Use JSON)</button>
                     <button id="resetDeploymentSettingsBtn" class="template-btn save-btn" style="background-color: #8A8886; color: white; min-width: 120px; padding: 0.5rem 1rem;">Reset to JSON Defaults</button>
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
                     <button id="cancelDeploymentSettingsBtn" class="template-btn save-btn" style="background-color: #8A8886; color: white; min-width: 100px; padding: 0.5rem 1rem;">Cancel</button>
-                    <button id="saveDeploymentSettingsBtn" class="template-btn save-btn" style="background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; min-width: 100px; padding: 0.5rem 1rem;">Save</button>
+                    <button id="saveDeploymentSettingsBtn" class="template-btn save-btn" style="min-width: 100px; padding: 0.5rem 1rem;">Save</button>
                 </div>
             </div>
         </div>

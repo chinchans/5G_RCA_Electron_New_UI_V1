@@ -1780,12 +1780,13 @@ async def execute_test_execution_process(job_id: str, config: TestExecutionConfi
             "message": "Starting test execution...",
             "error": None,
             "build_result": None,
-            "build_number": None
+            "build_number": None,
+            "output": ""
         }
         
-        # Get the path to jenkins_build_trigger_with_results.py script
+        # Get the path to Jenkins trigger script
         current_dir = Path(__file__).parent.parent
-        script_path = current_dir / "services" / "jenkins_build_trigger_with_results.py"
+        script_path = current_dir / "services" / "jenkins_build_trigger_with_rtesults.py"
         
         if not script_path.exists():
             test_execution_job_status[job_id]["status"] = "failed"
@@ -1798,6 +1799,7 @@ async def execute_test_execution_process(job_id: str, config: TestExecutionConfi
         
         import subprocess
         import sys
+        import re
         
         # Prepare configuration as JSON to pass to the script
         config_dict = {
@@ -1818,14 +1820,38 @@ async def execute_test_execution_process(job_id: str, config: TestExecutionConfi
             stderr=subprocess.PIPE,
             shell=False,
             text=True,
+            bufsize=1,
             cwd=str(script_path.parent)  # Run from the script's directory
         )
         
-        test_execution_job_status[job_id]["progress"] = 75
+        test_execution_job_status[job_id]["progress"] = 70
         test_execution_job_status[job_id]["message"] = "Monitoring Jenkins job execution..."
-        
-        # Wait for the process to complete
-        stdout, stderr = process.communicate()
+
+        # Stream script output live and parse progress/status markers.
+        stdout_lines = []
+        while True:
+            line = process.stdout.readline() if process.stdout else ''
+            if line:
+                clean_line = line.rstrip('\n')
+                stdout_lines.append(clean_line)
+
+                progress_match = re.match(r"^PROGRESS:(\d{1,3})$", clean_line.strip())
+                status_match = re.match(r"^STATUS:(.+)$", clean_line.strip())
+                if progress_match:
+                    pct = max(0, min(100, int(progress_match.group(1))))
+                    test_execution_job_status[job_id]["progress"] = pct
+                elif status_match:
+                    test_execution_job_status[job_id]["message"] = status_match.group(1).strip()
+
+            if process.poll() is not None:
+                if process.stdout:
+                    remainder = process.stdout.read()
+                    if remainder:
+                        stdout_lines.extend(remainder.splitlines())
+                break
+
+        stderr = process.stderr.read() if process.stderr else ""
+        stdout = "\n".join(stdout_lines)
         
         # Extract console output from stdout (between markers)
         console_output = ""

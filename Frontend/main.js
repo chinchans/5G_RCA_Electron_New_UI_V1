@@ -1,7 +1,13 @@
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const {
+    applyCuSimnovusConfPatch,
+    SOURCE_CONF_PATH,
+    DEFAULT_TARGET_CONF_PATH
+} = require('./cuSimnovusConfPatch');
+const { transferCuSimnovusConf } = require('./cuSimnovusTransfer');
 
 let mainWindow;
 
@@ -64,14 +70,147 @@ ipcMain.handle('show-open-directory-dialog', async (event, { title }) => {
 
 ipcMain.handle('list-files-in-directory', async (event, { folderPath }) => {
     try {
-        const files = fs.readdirSync(folderPath).map(file => ({
-            name: file,
-            path: path.join(folderPath, file),
-            size: fs.statSync(path.join(folderPath, file)).size
-        }));
+        const files = fs.readdirSync(folderPath)
+            .filter((file) => {
+                try {
+                    return fs.statSync(path.join(folderPath, file)).isFile();
+                } catch {
+                    return false;
+                }
+            })
+            .map((file) => ({
+                name: file,
+                path: path.join(folderPath, file),
+                size: fs.statSync(path.join(folderPath, file)).size
+            }));
         return files;
     } catch (e) {
         return [];
+    }
+});
+
+function getBackendExtractRoot() {
+    // main.js lives in Frontend/ — Backend extract root is sibling Backend/resources/extract
+    return path.join(path.resolve(__dirname, '..'), 'Backend', 'resources', 'extract');
+}
+
+/** Resolve dataset file paths that may be relative to Backend, not Electron cwd (Frontend). */
+function resolveDatasetFilePath(filePath, workingDirectory) {
+    if (!filePath || typeof filePath !== 'string') return null;
+
+    const backendExtract = getBackendExtractRoot();
+    const normalizedInput = filePath.replace(/\\/g, '/');
+    const candidates = [];
+
+    const addCandidate = (p) => {
+        if (!p) return;
+        try {
+            candidates.push(path.normalize(p));
+        } catch (_) {
+            /* ignore invalid paths */
+        }
+    };
+
+    addCandidate(filePath);
+
+    if (path.isAbsolute(filePath)) {
+        addCandidate(filePath);
+    } else {
+        // Wrong default: path.resolve(filePath) uses process.cwd() (often Frontend/)
+        addCandidate(path.resolve(process.cwd(), filePath));
+        addCandidate(path.resolve(__dirname, filePath));
+
+        const rel = normalizedInput.replace(/^\.?\//, '');
+        const relNoExtractPrefix = rel.replace(/^extract\//, '').replace(/^resources\/extract\//, '');
+
+        addCandidate(path.join(backendExtract, relNoExtractPrefix));
+        addCandidate(path.join(backendExtract, rel));
+
+        if (rel.includes('datasets/')) {
+            const fromDatasets = rel.substring(rel.indexOf('datasets/'));
+            addCandidate(path.join(backendExtract, fromDatasets));
+        }
+
+        if (workingDirectory && typeof workingDirectory === 'string') {
+            addCandidate(path.resolve(workingDirectory, filePath));
+            addCandidate(path.join(workingDirectory, relNoExtractPrefix));
+            addCandidate(path.join(workingDirectory, rel));
+        }
+    }
+
+    const seen = new Set();
+    for (const candidate of candidates) {
+        if (!candidate || seen.has(candidate)) continue;
+        seen.add(candidate);
+        try {
+            if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+                return candidate;
+            }
+        } catch (_) {
+            /* try next candidate */
+        }
+    }
+
+    return null;
+}
+
+// Read a file from disk for staging in the renderer (e.g. total_content.txt → Test Script Generator upload)
+ipcMain.handle('read-file-for-upload', async (event, { filePath, workingDirectory }) => {
+    try {
+        if (!filePath || typeof filePath !== 'string') {
+            return { success: false, error: 'No file path provided' };
+        }
+        const resolved = resolveDatasetFilePath(filePath, workingDirectory);
+        if (!resolved) {
+            return {
+                success: false,
+                error: `File not found: ${filePath} (searched under Backend/resources/extract)`
+            };
+        }
+        const stat = fs.statSync(resolved);
+        if (!stat.isFile()) {
+            return { success: false, error: 'Path is not a file' };
+        }
+        const content = fs.readFileSync(resolved, 'utf-8');
+        return {
+            success: true,
+            name: path.basename(resolved),
+            path: resolved,
+            size: stat.size,
+            content
+        };
+    } catch (e) {
+        return { success: false, error: e.message || String(e) };
+    }
+});
+
+ipcMain.handle('get-backend-extract-root', async () => {
+    return { success: true, extractRoot: getBackendExtractRoot() };
+});
+
+ipcMain.handle('apply-cu-simnovus-conf', async (event, payload = {}) => {
+    try {
+        const sourcePath = payload.sourcePath || SOURCE_CONF_PATH;
+        const targetPath = payload.confPath || payload.targetPath || DEFAULT_TARGET_CONF_PATH;
+        const result = applyCuSimnovusConfPatch(
+            payload.params || payload,
+            sourcePath,
+            targetPath
+        );
+        if (result.success && payload.openAfterWrite) {
+            await shell.openPath(targetPath);
+        }
+        return result;
+    } catch (e) {
+        return { success: false, error: e.message || String(e) };
+    }
+});
+
+ipcMain.handle('transfer-cu-simnovus-conf', async (event, options = {}) => {
+    try {
+        return await transferCuSimnovusConf(options);
+    } catch (e) {
+        return { success: false, error: e.message || String(e) };
     }
 });
 

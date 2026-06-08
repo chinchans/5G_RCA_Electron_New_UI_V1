@@ -527,5 +527,28 @@
       ],
       "selected_config_patches": []
     }
+  },
+  {
+    "activity_type": "git-commit",
+    "activity_label": "Git Commit",
+    "title": "bug_analysis_20260601_193738.json",
+    "timestamp": "2026-06-01T14:10:58.890629",
+    "record": {
+      "commit_hash": "0b11db90",
+      "full_commit_hash": "0b11db902dc291601c023d5343eab3c50e6c10cc",
+      "commit_message": "Fix gNB configuration issue\n\nError Message: \"ERROR MESSAGE: \"No AMF is associated to the gNB\"\n\nApplied 0 code patches and 2 config patches.\n\nSelected Patch Details:\n- Config: amf_ip_address (cu_gnb.conf) (cu_gnb.conf)\n  Description: Must match deployment context value to ensure gNB correctly targets the AMF IP for NG interface association.\n- Config: GNB_IPV4_ADDRESS_FOR_NG_AMF (cu_gnb.conf) (cu_gnb.conf)\n  Description: Must match deployment context value to ensure gNB uses correct IP address for NG interface towards AMF.",
+      "commit_output": "[main 0b11db902d] Fix gNB configuration issue\n 3 files changed, 13 insertions(+), 2 deletions(-)",
+      "commit_error": null,
+      "commit_details": "0b11db902d Fix gNB configuration issue\n openair2/RRC/NR/rrc_gNB.c                               | 6 ++++++\n openair2/RRC/NR/rrc_gNB.c.backup                        | 5 +++++\n targets/PROJECTS/GENERIC-NR-5GC/CONF/cu_gnb.conf.backup | 4 ++--\n 3 files changed, 13 insertions(+), 2 deletions(-)",
+      "code_dir": "/home/tcs/genai_setups/5G_RCA_Electron/Backend/app/services/Error_fixing_pipelin/openairinterface-5g-develop",
+      "should_push": false,
+      "pushed": false,
+      "analysis_filename": "bug_analysis_20260601_193738.json",
+      "selected_code_patches": [],
+      "selected_config_patches": [
+        "amf_ip_address (cu_gnb.conf)",
+        "GNB_IPV4_ADDRESS_FOR_NG_AMF (cu_gnb.conf)"
+      ]
+    }
   }
 ]

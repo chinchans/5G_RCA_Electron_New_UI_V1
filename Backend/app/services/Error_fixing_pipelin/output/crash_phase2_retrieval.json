@@ -1,16 +1,16 @@
 {
-  "timestamp": "2025-12-08T12:20:33.139844",
+  "timestamp": "2026-06-01T19:47:43.639955",
   "phase": "crash_phase2_retrieval",
   "crash_info_summary": {
     "faulting_function": "rrc_gNB_send_NGAP_NAS_FIRST_REQ",
-    "fault_location": "/home/tcs/jayasvi/cu/openairinterface5g/openair2/RRC/NR/rrc_gNB_NGAP.c:173",
+    "fault_location": "/home/tcs/jayasvi/nov_2025_dev/ue/openairinterface5g/openair2/RRC/NR/rrc_gNB_NGAP.c:241",
     "backtrace_frames": 5
   },
   "prioritized_functions": [
     {
       "function_name": "rrc_gNB_send_NGAP_NAS_FIRST_REQ",
       "file_path": "openair2/RRC/NR/rrc_gNB_NGAP.c",
-      "line_number": "173",
+      "line_number": "241",
       "frame_number": 0,
       "priority_score": 1.0,
       "source": "backtrace",
@@ -19,7 +19,7 @@
     {
       "function_name": "rrc_gNB_decode_dcch",
       "file_path": "openair2/RRC/NR/rrc_gNB.c",
-      "line_number": "1711",
+      "line_number": "1965",
       "frame_number": 1,
       "priority_score": 0.95,
       "source": "backtrace",
@@ -28,7 +28,7 @@
     {
       "function_name": "rrc_gnb_task",
       "file_path": "openair2/RRC/NR/rrc_gNB.c",
-      "line_number": "2526",
+      "line_number": "2957",
       "frame_number": 2,
       "priority_score": 0.9,
       "source": "backtrace",
@@ -56,56 +56,56 @@
   "call_chain_expansion": [
     {
       "function_name": "BIT_STRING_to_uint32",
-      "file_path": "common/utils/oai_asn1.h",
+      "file_path": "openairinterface5g-develop/common/utils/oai_asn1.h",
       "priority_score": 0.85,
       "source": "crash_downstream",
       "reason": "Called by crash function rrc_gNB_send_NGAP_NAS_FIRST_REQ - potential null/invalid call"
     },
     {
       "function_name": "create_byte_array",
-      "file_path": "common/utils/ds/byte_array.c",
+      "file_path": "openairinterface5g-develop/common/utils/ds/byte_array.c",
       "priority_score": 0.85,
       "source": "crash_downstream",
       "reason": "Called by crash function rrc_gNB_send_NGAP_NAS_FIRST_REQ - potential null/invalid call"
     },
     {
       "function_name": "get_guami",
-      "file_path": "openair2/RRC/NR/rrc_gNB_NGAP.c",
+      "file_path": "openairinterface5g-develop/openair2/RRC/NR/rrc_gNB_NGAP.c",
       "priority_score": 0.85,
       "source": "crash_downstream",
       "reason": "Called by crash function rrc_gNB_send_NGAP_NAS_FIRST_REQ - potential null/invalid call"
     },
     {
       "function_name": "itti_alloc_new_message",
-      "file_path": "common/utils/ocp_itti/intertask_interface.cpp",
+      "file_path": "openairinterface5g-develop/common/utils/ocp_itti/intertask_interface.cpp",
       "priority_score": 0.85,
       "source": "crash_downstream",
       "reason": "Called by crash function rrc_gNB_send_NGAP_NAS_FIRST_REQ - potential null/invalid call"
     },
     {
       "function_name": "itti_send_msg_to_task",
-      "file_path": "common/utils/ocp_itti/intertask_interface.cpp",
+      "file_path": "openairinterface5g-develop/common/utils/ocp_itti/intertask_interface.cpp",
       "priority_score": 0.85,
       "source": "crash_downstream",
       "reason": "Called by crash function rrc_gNB_send_NGAP_NAS_FIRST_REQ - potential null/invalid call"
     },
     {
       "function_name": "rrc_gNB_send_NGAP_NAS_FIRST_REQ",
-      "file_path": "openair2/RRC/NR/rrc_gNB_NGAP.c",
+      "file_path": "openairinterface5g-develop/openair2/RRC/NR/rrc_gNB_NGAP.c",
       "priority_score": 0.85,
       "source": "crash_downstream",
       "reason": "Called by crash function rrc_gNB_send_NGAP_NAS_FIRST_REQ - potential null/invalid call"
     },
     {
       "function_name": "sizeof",
-      "file_path": "common/utils/T/T.h",
+      "file_path": "openairinterface5g-develop/common/utils/T/T.h",
       "priority_score": 0.85,
       "source": "crash_downstream",
       "reason": "Called by crash function rrc_gNB_send_NGAP_NAS_FIRST_REQ - potential null/invalid call"
     },
     {
       "function_name": "rrc_gNB_process_RRCSetupComplete",
-      "file_path": "openair2/RRC/NR/rrc_gNB.c",
+      "file_path": "openairinterface5g-develop/openair2/RRC/NR/rrc_gNB.c",
       "priority_score": 0.8,
       "source": "crash_upstream",
       "reason": "Calls crash function rrc_gNB_send_NGAP_NAS_FIRST_REQ - check parameter passing"

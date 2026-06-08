@@ -1,0 +1,47 @@
+{
+    "directed": true,
+    "multigraph": false,
+    "graph": {},
+    "nodes": [
+        {
+            "id": "start"
+        },
+        {
+            "id": "3GPP TS 23.502"
+        },
+        {
+            "id": "Clause 4.2.2.2.2: Initial registration procedure"
+        },
+        {
+            "id": "Clause 4.2.2.3.2: UE-initiated de-registration procedure"
+        },
+        {
+            "id": "Clause 4.3.2.2.1: UE Requested PDU Session Establishment for Non-roaming and Roaming with Local Breakout case"
+        },
+        {
+            "id": "Clause 4.3.4.2: PDU Session Release for UE or network requested PDU Session Release for Non-Roaming and Roaming with Local Breakout case"
+        }
+    ],
+    "edges": [
+        {
+            "source": "start",
+            "target": "3GPP TS 23.502"
+        },
+        {
+            "source": "3GPP TS 23.502",
+            "target": "Clause 4.2.2.2.2: Initial registration procedure"
+        },
+        {
+            "source": "3GPP TS 23.502",
+            "target": "Clause 4.2.2.3.2: UE-initiated de-registration procedure"
+        },
+        {
+            "source": "3GPP TS 23.502",
+            "target": "Clause 4.3.2.2.1: UE Requested PDU Session Establishment for Non-roaming and Roaming with Local Breakout case"
+        },
+        {
+            "source": "3GPP TS 23.502",
+            "target": "Clause 4.3.4.2: PDU Session Release for UE or network requested PDU Session Release for Non-Roaming and Roaming with Local Breakout case"
+        }
+    ]
+}

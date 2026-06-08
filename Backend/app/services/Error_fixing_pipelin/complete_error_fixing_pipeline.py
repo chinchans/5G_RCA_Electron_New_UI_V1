@@ -66,6 +66,9 @@ class CompleteErrorFixingPipeline:
         self.phase3_pipeline = FixSuggestionPipeline(openair_codebase_file_name=openair_codebase_file_name)
         self.log_parser = LogContextParser(openair_codebase_file_name=openair_codebase_file_name)
         self.crash_analyzer = SegmentationFaultAnalyzer(openair_codebase_file_name=openair_codebase_file_name)
+        # Reuse standard Phase 3 pipeline for 3GPP spec lookup in crash analysis (no second Azure client path).
+        if getattr(self.crash_analyzer, "phase3_fix_gen", None):
+            self.crash_analyzer.phase3_fix_gen.fix_suggestion_pipeline = self.phase3_pipeline
 
         # Optional Knowledge Graph (KG) enhancement for Phase 2 function expansion.
         self._kg_graph = None

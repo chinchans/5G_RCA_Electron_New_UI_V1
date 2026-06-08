@@ -41,6 +41,8 @@ class CrashPhase3FixGeneration:
         
         self.openair_codebase_file_name = openair_codebase_file_name
         self.codebase_path = f"Error_fixing_pipelin/{openair_codebase_file_name}"
+        # Optional: set by CompleteErrorFixingPipeline to reuse phase3_pipeline (3GPP lookup).
+        self.fix_suggestion_pipeline = None
         
         # Setup Azure OpenAI client
         self._setup_azure_client()
@@ -127,6 +129,7 @@ class CrashPhase3FixGeneration:
             crash_info=crash_info,
             suspected_functions=suspected_functions
         )
+        fix_suggestions = self._enrich_specification_context(fix_suggestions, error_text)
         
         # Format in fix_suggestions.json style
         formatted_results = {
@@ -153,6 +156,40 @@ class CrashPhase3FixGeneration:
         
         return formatted_results
     
+    def _enrich_specification_context(self, fix_suggestions: Dict[str, Any], error_text: str) -> Dict[str, Any]:
+        """
+        Attach 3GPP specification context using the same TF-IDF path as standard RCA.
+        Only fills specification_context when it is missing or empty (does not overwrite LLM content).
+        """
+        if not isinstance(fix_suggestions, dict):
+            return fix_suggestions
+
+        existing = (fix_suggestions.get("specification_context") or "").strip()
+        if existing:
+            return fix_suggestions
+
+        pipeline = self.fix_suggestion_pipeline
+        if pipeline is None:
+            try:
+                from .fix_suggestion_pipeline import FixSuggestionPipeline
+                pipeline = FixSuggestionPipeline(openair_codebase_file_name=self.openair_codebase_file_name)
+            except Exception as e:
+                logger.warning("Could not initialize FixSuggestionPipeline for 3GPP lookup: %s", e)
+                return fix_suggestions
+
+        try:
+            logger.info("📚 Loading 3GPP specification context for crash analysis...")
+            spec_context = pipeline._get_3gpp_specification_context(error_text)
+            if spec_context and str(spec_context).strip():
+                fix_suggestions["specification_context"] = spec_context
+                logger.info("✅ 3GPP specification context attached (%d chars)", len(spec_context))
+            else:
+                logger.info("ℹ️ No 3GPP specification context returned for crash analysis")
+        except Exception as e:
+            logger.warning("⚠️ 3GPP specification context lookup failed for crash analysis: %s", e)
+
+        return fix_suggestions
+
     def _generate_error_text(self, crash_info: Dict) -> str:
         """Generate error text summary from crash info"""
         signal = crash_info.get("signal", "SIGSEGV")

@@ -23,6 +23,12 @@ Backend/.env
 .env.local
 .env.*.local
 
+# Large ML / index artifacts (use faiss_indices.zip via Git LFS; unzip locally)
+Backend/app/services/Error_fixing_pipelin/faiss_indices/*.faiss
+Backend/app/services/Error_fixing_pipelin/faiss_indices/embeddings.npy
+Backend/app/services/Error_fixing_pipelin/faiss_indices/functions_embeddings.npy
+Backend/app/services/Error_fixing_pipelin/resources/embeddings/*.npy
+
 # IDE
 .vscode/
 .idea/

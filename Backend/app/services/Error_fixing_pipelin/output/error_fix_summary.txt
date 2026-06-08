@@ -1,26 +1,20 @@
 Error Fix Summary Report
 ============================================================
 
-Error: ERROR MESSAGE:
-Compilation failed with multiple critical errors in function ‘encode_drbs_to_setupmod’ and related functions in file openair2/F1AP/lib/f1ap_ue_context.c, including:
-
-- "error: unknown type name ‘F1AP_ProtocolExtensionContainer_10696P83_t’; did you mean ‘F1AP_ProtocolExtensionContainer_19016P83_t’?" at line 726 in function ‘encode_drbs_to_setupmod’
-- "error: request for member ‘list’ in something not a structure or union" repeatedly at lines 671, 679, 729, 737, 786, 788, 789, 853, 854 in openair2/F1AP/lib/f1ap_ue_context.c
-- "error: unknown type name ‘F1AP_ProtocolExtensionContainer_10696P82_t’" at line 784 in function ‘decode_drbs_to_setup’
-- Build terminated with error
-Log File: /home/tcs/genai_setups/5G_RCA_Electron/Backend/app/services/Error_fixing_pipelin/log_files/Build_gNB_fail_2.log
-Analysis Date: 2026-05-22 12:18:41
+Error: Segmentation Fault in rrc_gNB_send_NGAP_NAS_FIRST_REQ at /home/tcs/jayasvi/nov_2025_dev/ue/openairinterface5g/openair2/RRC/NR/rrc_gNB_NGAP.c:241
+Log File: /home/tcs/genai_setups/5G_RCA_Electron/Backend/app/services/Error_fixing_pipelin/log_files/segmentation_fault.log
+Analysis Date: 2026-06-01 19:49:00
 
 Deployment Context:
-- Role: CU
-- Active Configs: 0
-- Network: gNB=None, AMF=None
+- Role: DU
+- Active Configs: 2
+- Network: gNB=10.138.77.116, AMF=None
 
 Phase 2 Results:
-- Retrieval Method: compiler_ground_truth_primary_only
-- Functions: 6
+- Retrieval Method: crash_intelligent_grading
+- Functions: 10
 - Configs: 0
 
 Phase 3 Results:
-- Root Cause: The root cause of the compilation errors is the use of incorrect ASN.1 generated type names for F1AP protocol extension containers in openair2/F1AP/lib/f1ap_ue_context.c. The compiler explicitly sugge...
+- Root Cause: The crash is caused by a NULL pointer dereference of rrcSetupComplete in rrc_gNB_send_NGAP_NAS_FIRST_REQ due to missing NULL checks and an invalid use of 'req' before initialization. Additionally, rrc...
 - Fix Available: No

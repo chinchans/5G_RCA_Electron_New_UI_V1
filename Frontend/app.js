@@ -366,6 +366,145 @@ function closeAllOpenDropdowns() {
 }
 window.closeAllOpenDropdowns = closeAllOpenDropdowns;
 
+/** Set button opacity from background luminance (brighter fills → slightly lower opacity). */
+(function initActionButtonBrightnessOpacity() {
+    const ACTION_BUTTON_SELECTOR = [
+        '.bd-btn',
+        '.spec-intel-btn',
+        '.te-btn',
+        '.td-btn',
+        '.tsg-btn',
+        '#testScriptGeneratorNavNextBtn',
+        '#testDeploymentNavNextBtn',
+        '#datasetGeneratorNextBtn',
+        '.ca-btn-primary',
+        '.ce-btn-run-review',
+        '.workbench-btn-primary',
+        '.workbench-btn-outline',
+        '.activity-log-btn',
+        '.prompt-studio-new-btn',
+        '.prompt-studio-btn--primary',
+        '.prompt-studio-btn--outline',
+        '.home-btn',
+        '.template-btn.save-btn',
+        '.template-btn.modify-btn',
+        '.template-btn.browse-btn',
+        '.template-modal-btn.save',
+        '.launch-btn',
+        '.btn-primary',
+        '.btn-secondary',
+        '.select-template-btn',
+        '#bugFixPresentBtn',
+        '#clearDeploymentSettingsBtn'
+    ].join(',');
+
+    const SKIP_SELECTOR = [
+        '.dropdown-btn',
+        '.menu-toggle',
+        '.back-button',
+        '.template-modal-btn.cancel',
+        '.prompt-studio-btn--danger',
+        '#crashAnalysisToggle',
+        '.user-template-delete-btn',
+        '.landing-option-btn',
+        '.workbench-top-tab',
+        '.activity-timeline-row',
+        '.prompt-studio-category-card',
+        '.close-btn',
+        '.status-close',
+        '.td-loglevel-picker-btn',
+        '.td-loglevel-subitem'
+    ].join(',');
+
+    function parseRgb(color) {
+        if (!color || color === 'transparent') return null;
+        const rgbMatch = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+        if (rgbMatch) {
+            return [Number(rgbMatch[1]), Number(rgbMatch[2]), Number(rgbMatch[3])];
+        }
+        const hex = color.trim();
+        if (!hex.startsWith('#')) return null;
+        let h = hex.slice(1);
+        if (h.length === 3) {
+            h = h.split('').map((c) => c + c).join('');
+        }
+        if (h.length !== 6) return null;
+        return [
+            parseInt(h.slice(0, 2), 16),
+            parseInt(h.slice(2, 4), 16),
+            parseInt(h.slice(4, 6), 16)
+        ];
+    }
+
+    function relativeLuminance(r, g, b) {
+        const linear = (c) => {
+            const s = c / 255;
+            return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+        };
+        return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+    }
+
+    function opacityForLuminance(L) {
+        if (L >= 0.55) return 0.88;
+        if (L >= 0.35) return 0.94;
+        return 1;
+    }
+
+    function applyToButton(btn) {
+        if (!btn || btn.matches(SKIP_SELECTOR)) return;
+        if (btn.disabled) {
+            btn.style.setProperty('--app-btn-computed-opacity', '0.5');
+            btn.style.opacity = '0.5';
+            return;
+        }
+        const rgb = parseRgb(getComputedStyle(btn).backgroundColor);
+        if (!rgb) return;
+        const L = relativeLuminance(rgb[0], rgb[1], rgb[2]);
+        const op = opacityForLuminance(L);
+        btn.style.setProperty('--app-btn-computed-opacity', String(op));
+        btn.style.opacity = String(op);
+    }
+
+    function applyAll(root = document) {
+        root.querySelectorAll(ACTION_BUTTON_SELECTOR).forEach(applyToButton);
+    }
+
+    function scheduleApply() {
+        requestAnimationFrame(() => applyAll());
+    }
+
+    window.applyActionButtonBrightnessOpacity = applyAll;
+
+    document.addEventListener('DOMContentLoaded', scheduleApply);
+    window.addEventListener('load', scheduleApply);
+    document.addEventListener('mouseover', (e) => {
+        const btn = e.target.closest(ACTION_BUTTON_SELECTOR);
+        if (btn) applyToButton(btn);
+    }, true);
+
+    let observer;
+    document.addEventListener('DOMContentLoaded', () => {
+        observer = new MutationObserver((mutations) => {
+            for (const m of mutations) {
+                if (m.type === 'attributes' && (m.attributeName === 'style' || m.attributeName === 'class' || m.attributeName === 'disabled')) {
+                    scheduleApply();
+                    return;
+                }
+                if (m.addedNodes.length) {
+                    scheduleApply();
+                    return;
+                }
+            }
+        });
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style', 'class', 'disabled']
+        });
+    });
+})();
+
 document.addEventListener('DOMContentLoaded', function() {
     // --- Landing Page Button Handlers ---
     const wifiOptionBtn = document.getElementById('wifiOption');
@@ -453,12 +592,31 @@ document.addEventListener('DOMContentLoaded', function() {
     const executionProgressPct = document.getElementById('executionProgressPct');
     const executionStatus = document.getElementById('executionStatus');
     const executionOutput = document.getElementById('executionOutput');
+    const teDownloadLogBtn = document.getElementById('teDownloadLogBtn');
+    const teAnalyseFailuresBtn = document.getElementById('teAnalyseFailuresBtn');
     const teViewHistoryBtn = document.getElementById('teViewHistoryBtn');
     const teMetaResult = document.getElementById('teMetaResult');
     const teMetaDuration = document.getElementById('teMetaDuration');
+    const teKpiTestsRun = document.getElementById('teKpiTestsRun');
+    const teKpiTestsRunMeta = document.getElementById('teKpiTestsRunMeta');
+    const teKpiPassed = document.getElementById('teKpiPassed');
+    const teKpiPassedMeta = document.getElementById('teKpiPassedMeta');
+    const teKpiFailed = document.getElementById('teKpiFailed');
+    const teKpiFailedMeta = document.getElementById('teKpiFailedMeta');
+    const teKpiExecutionStatus = document.getElementById('teKpiSelfHealed');
+    const teKpiExecutionStatusMeta = document.getElementById('teKpiExecutionStatusMeta');
+    const teResultsSubtitle = document.getElementById('teResultsSubtitle');
+    const teResultsTableBody = document.querySelector('.te-results-table tbody');
 
     let teRunCounter = 0;
     let teExecutionStartTime = null;
+    let tePollIntervalId = null;
+    let teActiveJobId = null;
+    let teIsRunning = false;
+    let tePollToken = 0;
+
+    const TE_LOG_PLACEHOLDER = 'Execution output will appear here after you start execution…';
+    let teCurrentStats = { total: 0, passed: 0, failed: 0 };
 
     function teFormatLogTime(date) {
         return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -469,12 +627,339 @@ document.addEventListener('DOMContentLoaded', function() {
         const ts = teFormatLogTime(new Date());
         const prefix = level ? `${ts} ${level}` : `${ts}`;
         const line = `${prefix} ${message}\n`;
-        if (executionOutput.textContent.includes('Execution output will appear here')) {
+        const oc = executionOutput.textContent || '';
+        const isPlaceholder =
+            !oc.trim() ||
+            oc.includes('Execution output will appear here') ||
+            oc.trim() === TE_LOG_PLACEHOLDER.trim();
+        if (isPlaceholder) {
             executionOutput.textContent = line;
         } else {
             executionOutput.textContent += line;
         }
         executionOutput.scrollTop = executionOutput.scrollHeight;
+        teUpdateDownloadButtonState();
+        teUpdateMetricsFromLog(executionOutput.textContent || '');
+    }
+
+    function teResetExecutionMetrics() {
+        teCurrentStats = { total: 0, passed: 0, failed: 0 };
+        if (teKpiTestsRun) teKpiTestsRun.textContent = '0';
+        if (teKpiTestsRunMeta) teKpiTestsRunMeta.textContent = '0 of 0 executed';
+        if (teKpiPassed) teKpiPassed.textContent = '0';
+        if (teKpiPassedMeta) teKpiPassedMeta.textContent = '0% pass rate';
+        if (teKpiFailed) teKpiFailed.textContent = '0';
+        if (teKpiFailedMeta) teKpiFailedMeta.textContent = '0% failure rate';
+        if (teKpiExecutionStatus) teKpiExecutionStatus.textContent = 'PENDING';
+        if (teKpiExecutionStatusMeta) teKpiExecutionStatusMeta.textContent = 'No run yet';
+        if (teResultsSubtitle) teResultsSubtitle.textContent = '0 tests · 0 pass · 0 fail';
+        teRenderResultsTable([]);
+    }
+
+    function teInferLayer(testCaseName) {
+        const name = String(testCaseName || '').toUpperCase();
+        if (name.includes('RRC')) return 'RRC';
+        if (name.includes('NAS')) return 'NAS';
+        if (name.includes('NGAP')) return 'NGAP';
+        if (name.includes('S1AP')) return 'S1AP';
+        if (name.includes('GTP')) return 'GTP';
+        if (name.includes('MAC')) return 'MAC';
+        if (name.includes('RLC')) return 'RLC';
+        if (name.includes('PDCP')) return 'PDCP';
+        if (name.includes('PHY')) return 'PHY';
+        return 'NAS';
+    }
+
+    function teExtractTestCaseResults(logText) {
+        if (!logText) return [];
+        const lines = String(logText).split(/\r?\n/);
+        const results = [];
+        const seen = new Set();
+
+        const isSeparator = (value) => /^[\s\-=_|:+*.]+$/.test(value || '');
+        const isResultOnly = (value) => /^\|?\s*(PASS|FAIL(?:ED|URE)?)\s*\|?$/i.test(value || '');
+        const isValidCaseName = (value) => {
+            if (!value) return false;
+            const v = String(value).trim();
+            if (!v || isSeparator(v) || isResultOnly(v)) return false;
+            if (v.toUpperCase() === 'ATTACH') return false;
+            // Keep only token-like test names (avoid random prose lines)
+            return /^[A-Za-z][A-Za-z0-9_.-]*$/.test(v);
+        };
+
+        const pushResult = (testCase, result) => {
+            if (!isValidCaseName(testCase)) return;
+            const normalizedResult = String(result || '').toUpperCase().startsWith('PASS') ? 'PASS' : 'FAIL';
+            const key = `${testCase}__${normalizedResult}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            results.push({ key, testCase, layer: teInferLayer(testCase), result: normalizedResult });
+        };
+
+        for (let i = 0; i < lines.length; i += 1) {
+            const line = (lines[i] || '').trim();
+            if (!line) continue;
+
+            // Pattern A: same-line case + result, e.g. "RRCSETUP ... | PASS |"
+            const inlineMatch = line.match(/([A-Za-z][A-Za-z0-9_.-]*)[^\n]*\|\s*(PASS|FAIL(?:ED|URE)?)\s*\|/i);
+            if (inlineMatch) {
+                pushResult(inlineMatch[1], inlineMatch[2]);
+                continue;
+            }
+
+            // Pattern B: case line followed by result line in next 1-3 lines
+            const caseOnlyMatch = line.match(/^([A-Za-z][A-Za-z0-9_.-]*)\s*(?:\[[^\]]*\])?$/);
+            if (caseOnlyMatch) {
+                let lookedResult = null;
+                for (let j = 1; j <= 3; j += 1) {
+                    const next = (lines[i + j] || '').trim();
+                    const m = next.match(/^\|?\s*(PASS|FAIL(?:ED|URE)?)\s*\|?$/i);
+                    if (m) {
+                        lookedResult = m[1];
+                        break;
+                    }
+                }
+                if (lookedResult) {
+                    pushResult(caseOnlyMatch[1], lookedResult);
+                    continue;
+                }
+            }
+
+            // Pattern C: result line, infer nearest previous case line
+            const resultLineMatch = line.match(/^\|?\s*(PASS|FAIL(?:ED|URE)?)\s*\|?$/i);
+            if (resultLineMatch) {
+                for (let back = 1; back <= 3; back += 1) {
+                    const prev = (lines[i - back] || '').trim();
+                    const prevCase = prev.match(/^([A-Za-z][A-Za-z0-9_.-]*)\s*(?:\[[^\]]*\])?$/);
+                    if (prevCase && isValidCaseName(prevCase[1])) {
+                        pushResult(prevCase[1], resultLineMatch[1]);
+                        break;
+                    }
+                }
+            }
+        }
+        return results;
+    }
+
+    function teRenderResultsTable(rows) {
+        if (!teResultsTableBody) return;
+        if (!rows || rows.length === 0) {
+            teResultsTableBody.innerHTML = `
+                <tr>
+                    <td>—</td>
+                    <td>—</td>
+                    <td><span class="te-badge te-badge--muted">Pending</span></td>
+                </tr>
+            `;
+            return;
+        }
+
+        teResultsTableBody.innerHTML = rows.map(row => {
+            const badgeClass = row.result === 'PASS' ? 'te-badge--success' : 'te-badge--fail';
+            return `
+                <tr>
+                    <td>${row.testCase}</td>
+                    <td>${row.layer}</td>
+                    <td><span class="te-badge ${badgeClass}">${row.result}</span></td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function teParseExecutionStats(logText) {
+        if (!logText) return null;
+        const patterns = [
+            /(\d+)\s*tests?\s*,\s*(\d+)\s*passed\s*,\s*(\d+)\s*failed/gi,
+            /tests?\s*run\s*[:=]\s*(\d+)[^\n]*passed\s*[:=]\s*(\d+)[^\n]*failed\s*[:=]\s*(\d+)/gi
+        ];
+
+        let latest = null;
+        for (const regex of patterns) {
+            let match;
+            while ((match = regex.exec(logText)) !== null) {
+                const total = Number(match[1]) || 0;
+                const passed = Number(match[2]) || 0;
+                const failed = Number(match[3]) || 0;
+                latest = { total, passed, failed };
+            }
+            if (latest) break;
+        }
+        return latest;
+    }
+
+    function teApplyExecutionStats(stats) {
+        if (!stats) return;
+        const total = Math.max(0, Number(stats.total) || 0);
+        const passed = Math.max(0, Number(stats.passed) || 0);
+        const failed = Math.max(0, Number(stats.failed) || 0);
+        const executed = Math.min(total, passed + failed);
+        const passRate = total > 0 ? Math.round((passed / total) * 100) : 0;
+        const failureRate = total > 0 ? Math.round((failed / total) * 100) : 0;
+
+        teCurrentStats = { total, passed, failed };
+
+        if (teKpiTestsRun) teKpiTestsRun.textContent = String(total);
+        if (teKpiTestsRunMeta) teKpiTestsRunMeta.textContent = `${executed} of ${total} executed`;
+        if (teKpiPassed) teKpiPassed.textContent = String(passed);
+        if (teKpiPassedMeta) teKpiPassedMeta.textContent = `${passRate}% pass rate`;
+        if (teKpiFailed) teKpiFailed.textContent = String(failed);
+        if (teKpiFailedMeta) teKpiFailedMeta.textContent = `${failureRate}% failure rate`;
+        if (teResultsSubtitle) teResultsSubtitle.textContent = `${total} tests · ${passed} pass · ${failed} fail`;
+
+        if (teKpiExecutionStatus) {
+            if (failed > 0) teKpiExecutionStatus.textContent = 'FAIL';
+            else if (executed > 0 && executed === total) teKpiExecutionStatus.textContent = 'PASS';
+            else teKpiExecutionStatus.textContent = 'IN PROGRESS';
+        }
+        if (teKpiExecutionStatusMeta) {
+            if (failed > 0) teKpiExecutionStatusMeta.textContent = `${failed} test(s) failed`;
+            else if (executed > 0 && executed === total) teKpiExecutionStatusMeta.textContent = 'All executed tests passed';
+            else teKpiExecutionStatusMeta.textContent = 'Execution in progress';
+        }
+
+        // Keep progress bar live from parsed run totals when available.
+        if (teIsRunning && total > 0) {
+            const livePct = Math.max(0, Math.min(100, Math.round((executed / total) * 100)));
+            teSetProgress(livePct, null);
+        }
+    }
+
+    function teUpdateMetricsFromLog(logText) {
+        const parsed = teParseExecutionStats(logText);
+        if (parsed) teApplyExecutionStats(parsed);
+        const resultRows = teExtractTestCaseResults(logText);
+        teRenderResultsTable(resultRows);
+    }
+
+    function teSetRunningState(isRunning) {
+        teIsRunning = Boolean(isRunning);
+        if (startExecutionBtn) startExecutionBtn.disabled = teIsRunning;
+        // Idle: both Start and Stop are enabled (Stop no-ops unless a run is active)
+        if (teViewHistoryBtn) teViewHistoryBtn.disabled = false;
+    }
+
+    function teRestoreStartButtonIdle() {
+        if (!startExecutionBtn) return;
+        startExecutionBtn.classList.remove('te-btn-execute--busy');
+        const lbl = startExecutionBtn.querySelector('.te-btn-label');
+        if (lbl) lbl.textContent = 'Start Execution';
+        else startExecutionBtn.textContent = 'Start Execution';
+    }
+
+    /** Match first-load idle UI (same as before first Start click for this aborted run). */
+    function teResetUiToIdleBeforeRun() {
+        teRunCounter = Math.max(0, teRunCounter - 1);
+        teUpdateRunLabels(teRunCounter);
+
+        teRestoreStartButtonIdle();
+
+        if (executionProgressFill) executionProgressFill.style.width = '0%';
+
+        teSetProgress(0, null);
+        teSetStatusBadge('Not Started', 'pending');
+
+        if (teMetaResult) {
+            teMetaResult.textContent = 'Pending';
+            teMetaResult.className = 'te-meta-val te-meta-val--fail';
+        }
+        if (teMetaDuration) teMetaDuration.textContent = '—';
+
+        teExecutionStartTime = null;
+
+        if (executionOutput) {
+            executionOutput.textContent = TE_LOG_PLACEHOLDER;
+            executionOutput.scrollTop = 0;
+        }
+        teResetExecutionMetrics();
+        teUpdateDownloadButtonState();
+    }
+
+    async function teAttemptBackendStop(jobId) {
+        if (!jobId) return false;
+        try {
+            if (window.API && typeof window.API.stopTestExecution === 'function') {
+                const res = await window.API.stopTestExecution(jobId);
+                return Boolean(res?.success ?? res);
+            }
+            const apiBaseUrl = window.API?.API_BASE_URL || 'http://127.0.0.1:8000';
+            const resp = await fetch(`${apiBaseUrl}/api/test-execution/stop/${jobId}`, { method: 'POST' });
+            if (!resp.ok) return false;
+            const data = await resp.json().catch(() => ({}));
+            return Boolean(data?.success ?? true);
+        } catch (_) {
+            return false;
+        }
+    }
+
+    async function teStopExecution(reason = 'Execution stopped by user') {
+        if (!teIsRunning) {
+            if (typeof showStatusBar === 'function') {
+                showStatusBar('No execution is running.', 'info');
+            }
+            return;
+        }
+
+        // Invalidate any in-flight poll response before doing anything else.
+        tePollToken += 1;
+
+        if (tePollIntervalId) {
+            clearInterval(tePollIntervalId);
+            tePollIntervalId = null;
+        }
+
+        const jobIdToStop = teActiveJobId;
+        teActiveJobId = null;
+
+        // Immediately restore idle UI so Stop feels instant.
+        teSetRunningState(false);
+        teResetUiToIdleBeforeRun();
+
+        // Best-effort backend stop, do not block UI reset.
+        void teAttemptBackendStop(jobIdToStop);
+
+        if (typeof showStatusBar === 'function') {
+            showStatusBar(reason, 'info');
+        }
+    }
+
+    function teGetLogTextForDownload() {
+        if (!executionOutput) return '';
+        const text = (executionOutput.textContent || '').trimEnd();
+        if (!text || text.includes('Execution output will appear here')) return '';
+        return text;
+    }
+
+    function teUpdateDownloadButtonState() {
+        if (!teDownloadLogBtn) return;
+        teDownloadLogBtn.disabled = !teGetLogTextForDownload();
+    }
+
+    function teDownloadCurrentLog() {
+        const logText = teGetLogTextForDownload();
+        if (!logText) {
+            if (typeof showStatusBar === 'function') {
+                showStatusBar('No execution log available to download yet.', 'warning');
+            }
+            return;
+        }
+
+        const runLabel = (document.getElementById('teRunLabel')?.textContent || 'Run').replace(/\s+/g, '_');
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `live_execution_log_${runLabel}_${timestamp}.txt`;
+
+        const blob = new Blob([logText], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+
+        if (typeof showStatusBar === 'function') {
+            showStatusBar('Execution log downloaded.', 'success');
+        }
     }
 
     function teSetProgress(pct, state) {
@@ -510,19 +995,36 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if (teViewHistoryBtn) {
-        teViewHistoryBtn.addEventListener('click', () => {
-            if (typeof showStatusBar === 'function') {
-                showStatusBar('Execution history — static preview (no runs stored yet)', 'info');
+    if (teDownloadLogBtn) {
+        teDownloadLogBtn.addEventListener('click', () => teDownloadCurrentLog());
+        // Initial state: disabled until we have real output
+        teUpdateDownloadButtonState();
+    }
+
+    if (teAnalyseFailuresBtn) {
+        teAnalyseFailuresBtn.addEventListener('click', () => {
+            if (typeof window.navigateToAppSection === 'function') {
+                window.navigateToAppSection('bug-discovery');
+            } else if (typeof navigateToAppSection === 'function') {
+                navigateToAppSection('bug-discovery');
+            } else {
+                const bd = document.getElementById('bug-discovery');
+                if (bd) bd.classList.add('active');
             }
         });
     }
+
+    if (teViewHistoryBtn) {
+        teViewHistoryBtn.addEventListener('click', () => teStopExecution('Execution stopped'));
+    }
+
+    teResetExecutionMetrics();
 
     if (startExecutionBtn) {
         startExecutionBtn.addEventListener('click', async () => {
             console.log('[Test Execution] Start Execution button clicked');
 
-            startExecutionBtn.disabled = true;
+            teSetRunningState(true);
             startExecutionBtn.classList.add('te-btn-execute--busy');
             const teExecLabel = startExecutionBtn.querySelector('.te-btn-label');
             if (teExecLabel) teExecLabel.textContent = 'Executing...';
@@ -541,6 +1043,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (executionOutput) {
                 executionOutput.textContent = '';
             }
+            teResetExecutionMetrics();
+            if (teKpiExecutionStatus) teKpiExecutionStatus.textContent = 'IN PROGRESS';
+            if (teKpiExecutionStatusMeta) teKpiExecutionStatusMeta.textContent = 'Execution started';
+            teUpdateDownloadButtonState();
             teAppendLogLine('Initializing test execution…', 'INFO');
 
             try {
@@ -566,12 +1072,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 const jobId = response.job_id;
+                teActiveJobId = jobId;
                 teSetStatusBadge('Processing...', 'running');
                 teAppendLogLine(`Test execution started (Job ID: ${jobId})`, 'INFO');
 
                 let teLastStatusMessage = '';
-                const pollInterval = setInterval(async () => {
+                if (tePollIntervalId) {
+                    clearInterval(tePollIntervalId);
+                    tePollIntervalId = null;
+                }
+                const runPollToken = tePollToken;
+                tePollIntervalId = setInterval(async () => {
                     try {
+                        if (tePollToken !== runPollToken) return;
                         let statusResponse;
                         if (!window.API || typeof window.API.getTestExecutionStatus !== 'function') {
                             const apiBaseUrl = window.API?.API_BASE_URL || 'http://127.0.0.1:8000';
@@ -583,6 +1096,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         } else {
                             statusResponse = await window.API.getTestExecutionStatus(jobId);
                         }
+
+                        if (tePollToken !== runPollToken) return;
 
                         if (!statusResponse) return;
 
@@ -615,15 +1130,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (executionOutput && statusResponse.output) {
                             executionOutput.textContent = statusResponse.output;
                             executionOutput.scrollTop = executionOutput.scrollHeight;
+                            teUpdateDownloadButtonState();
+                            teUpdateMetricsFromLog(statusResponse.output);
                         }
 
                         if (statusResponse.status === 'completed'|| statusResponse.status === 'failed') {
-                            clearInterval(pollInterval);
-                            startExecutionBtn.disabled = false;
-                            startExecutionBtn.classList.remove('te-btn-execute--busy');
-                            const teExecLabelDone = startExecutionBtn.querySelector('.te-btn-label');
-                            if (teExecLabelDone) teExecLabelDone.textContent = 'Start Execution';
-                            else startExecutionBtn.textContent = 'Start Execution';
+                            if (tePollIntervalId) {
+                                clearInterval(tePollIntervalId);
+                                tePollIntervalId = null;
+                            }
+                            teRestoreStartButtonIdle();
+                            teSetRunningState(false);
+                            teActiveJobId = null;
                             teSetProgress(100, statusResponse.status === 'completed'&& statusResponse.build_result === 'SUCCESS'? 'success': 'fail');
 
                             const resultLabel = statusResponse.build_result || (statusResponse.status === 'completed'? 'SUCCESS': 'FAILED');
@@ -645,27 +1163,37 @@ document.addEventListener('DOMContentLoaded', function() {
                                 teMetaDuration.textContent = m > 0 ? `${m}m ${s}s` : `${s}s`;
                             }
 
+                            // Final status must reflect parsed test outcomes from log.
+                            if (teCurrentStats.failed > 0) {
+                                if (teKpiExecutionStatus) teKpiExecutionStatus.textContent = 'FAIL';
+                                if (teKpiExecutionStatusMeta) teKpiExecutionStatusMeta.textContent = `${teCurrentStats.failed} test(s) failed`;
+                            } else if (teCurrentStats.total > 0) {
+                                if (teKpiExecutionStatus) teKpiExecutionStatus.textContent = 'PASS';
+                                if (teKpiExecutionStatusMeta) teKpiExecutionStatusMeta.textContent = 'All executed tests passed';
+                            }
+
                             teAppendLogLine(`Execution finished — Result: ${resultLabel}`, isSuccess ? 'PASS': 'FAIL');
                         }
                     } catch (pollError) {
                         console.error('[Test Execution] Polling error:', pollError);
-                        clearInterval(pollInterval);
+                        if (tePollIntervalId) {
+                            clearInterval(tePollIntervalId);
+                            tePollIntervalId = null;
+                        }
                         teSetStatusBadge(`Error: ${pollError.message}`, 'fail');
                         teAppendLogLine(pollError.message, 'FAIL');
-                        startExecutionBtn.disabled = false;
-                        startExecutionBtn.classList.remove('te-btn-execute--busy');
-                        const teExecLabelErr = startExecutionBtn.querySelector('.te-btn-label');
-                        if (teExecLabelErr) teExecLabelErr.textContent = 'Start Execution';
-                        else startExecutionBtn.textContent = 'Start Execution';
+                        teRestoreStartButtonIdle();
+                        teSetRunningState(false);
+                        teActiveJobId = null;
                     }
                 }, 2000);
             } catch (error) {
                 console.error('[Test Execution] Error:', error);
-                startExecutionBtn.disabled = false;
-                startExecutionBtn.classList.remove('te-btn-execute--busy');
-                const teExecLabelCatch = startExecutionBtn.querySelector('.te-btn-label');
-                if (teExecLabelCatch) teExecLabelCatch.textContent = 'Start Execution';
-                else startExecutionBtn.textContent = 'Start Execution';
+                teRunCounter = Math.max(0, teRunCounter - 1);
+                teUpdateRunLabels(teRunCounter);
+                teRestoreStartButtonIdle();
+                teSetRunningState(false);
+                teActiveJobId = null;
                 teSetStatusBadge(`Error: ${error.message}`, 'fail');
                 teSetProgress(0, 'fail');
                 if (teMetaResult) {
@@ -1091,7 +1619,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } = options;
 
         showBdAnalysisResultsPanel(true);
-        updateBdAnalysisArtifactRadios(crashAnalysisEnabled);
         updateArtifactsDropdown(crashAnalysisEnabled);
         showViewArtifactsSection(true);
         setBdProgressTrackerState('complete');
@@ -1117,9 +1644,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'suspected-functions': 'Suspected Functions',
         'code-patches': 'Code Patches',
         'investigation-steps': 'Investigation Steps',
-        'investigation-commands': 'Investigation Commands',
-        'crash-details': 'Crash Details',
-        'backtrace': 'Backtrace'
+        'investigation-commands': 'Investigation Commands'
     };
 
     function showBdAnalysisResultsPanel(show) {
@@ -1137,8 +1662,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getBdAnalysisResultCounts() {
-        const fixSuggestions = window.bugDiscoveryFixSuggestions || {};
-        const fixSuggestion = fixSuggestions.fix_suggestion || {};
+        const { fixSuggestion } = getBugDiscoveryNormalizedContext();
         return {
             suspectedFunctions: (fixSuggestion.suspected_functions || []).length,
             codePatches: (fixSuggestion.code_patches || []).length
@@ -1174,12 +1698,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateBdAnalysisDetailHeader(value);
         showBdAnalysisResultsPanel(true);
         renderBugDiscoveryArtifact(value, bdAnalysisDetailDisplay);
-    }
-
-    function updateBdAnalysisArtifactRadios(isCrashAnalysis) {
-        document.querySelectorAll('.bd-analysis-radio-crash').forEach((el) => {
-            el.style.display = isCrashAnalysis ? '': 'none';
-        });
     }
 
     function initBdAnalysisRadioListeners() {
@@ -1445,6 +1963,257 @@ document.addEventListener('DOMContentLoaded', () => {
         showStatusBar(`RCA report downloaded as ${extension.toUpperCase()}`, 'success', 'Bug Discovery');
     }
 
+    const BD_ENV_FLAKY_PATTERNS = [
+        /\bflaky\b/i,
+        /\btimeout\b/i,
+        /\benvironment(al)?\b/i,
+        /\bcmake\b/i,
+        /\bbuild[_\s-]?fail/i,
+        /\bcommand not found\b/i,
+        /\bdependency\b/i,
+        /\bnetwork\b/i,
+        /\bconnectivity\b/i,
+        /\breachability\b/i,
+        /\bdeployment\b/i,
+        /\bassociation\b/i,
+        /\bno route\b/i,
+        /\bconnection refused\b/i,
+        /\bping\b/i,
+        /\broute\b/i,
+        /\bamf\b/i,
+        /\busrp\b/i,
+        /\bsctp\b/i,
+        /\bno amf\b/i,
+        /\bhandover.*timeout\b/i
+    ];
+
+    const BD_REAL_DEFECT_PATTERNS = [
+        /\bsegfault\b/i,
+        /\bsegmentation fault\b/i,
+        /\bsigsegv\b/i,
+        /\bassert(ion)?\b/i,
+        /\bnull pointer\b/i,
+        /\bintegrity\b/i,
+        /\bcipher(ing)?\b/i,
+        /\bpdcp\b/i,
+        /\brrc\b/i,
+        /\brlc\b/i,
+        /\bmac\b/i,
+        /\bphy\b/i,
+        /\bprotocol\b/i,
+        /\blogic\b/i,
+        /\bmemory leak\b/i,
+        /\bstack overflow\b/i
+    ];
+
+    const BD_ENV_ERROR_TYPE_HINTS = [
+        'amf_association',
+        'association_failure',
+        'connectivity',
+        'network',
+        'deployment',
+        'build',
+        'cmake',
+        'dependency',
+        'timeout',
+        'flaky',
+        'environment',
+        'usrp',
+        'route',
+        'ping'
+    ];
+
+    const BD_REAL_DEFECT_LAYERS = new Set(['RRC', 'PDCP', 'RLC', 'MAC', 'PHY']);
+
+    /**
+     * Classify one detected error for KPI segregation.
+     * Returns 'env' (environment / flaky / deploy) or 'real' (code / protocol defect).
+     */
+    function classifyBdErrorCategory(errorKey, occurrence = {}) {
+        const key = String(errorKey || '').toLowerCase();
+        const line = String(occurrence.line || occurrence.pattern || '').toLowerCase();
+        const layer = String(occurrence.layer || '').toUpperCase();
+        const combined = `${key} ${line}`;
+
+        if (BD_ENV_FLAKY_PATTERNS.some((pattern) => pattern.test(combined))) {
+            return 'env';
+        }
+        if (BD_REAL_DEFECT_PATTERNS.some((pattern) => pattern.test(combined))) {
+            return 'real';
+        }
+        if (BD_ENV_ERROR_TYPE_HINTS.some((hint) => key.includes(hint))) {
+            return 'env';
+        }
+        if (layer === 'NGAP' && /\bamf\b|association|sctp|not associated/i.test(combined)) {
+            return 'env';
+        }
+        if (BD_REAL_DEFECT_LAYERS.has(layer)) {
+            return 'real';
+        }
+        if (layer === 'NAS' && /\breject\b|failure|error/i.test(combined)) {
+            return 'real';
+        }
+
+        // Unknown: treat operational log/setup issues as env, else code defect
+        if (/\bfail|error|timeout|not found|unreachable\b/i.test(combined) &&
+            !/\bintegrity|segfault|assert|null\b/i.test(combined)) {
+            return 'env';
+        }
+        return 'real';
+    }
+
+    function countBdErrorsFromAnalysis(errorAnalysis) {
+        if (!errorAnalysis || typeof errorAnalysis !== 'object') {
+            return { total: 0, envFlaky: 0, realDefects: 0, breakdown: [] };
+        }
+
+        const identified = errorAnalysis.identified_errors || {};
+        let total = 0;
+        let envFlaky = 0;
+        const breakdown = [];
+
+        Object.entries(identified).forEach(([errorKey, occurrences]) => {
+            const list = Array.isArray(occurrences) ? occurrences : [];
+            list.forEach((occurrence) => {
+                total += 1;
+                const category = classifyBdErrorCategory(errorKey, occurrence);
+                if (category === 'env') envFlaky += 1;
+                breakdown.push({
+                    errorKey,
+                    category,
+                    layer: occurrence.layer || 'Unknown',
+                    line: occurrence.line_number,
+                    pattern: occurrence.pattern
+                });
+            });
+        });
+
+        if (total === 0 && errorAnalysis.error_counts) {
+            Object.entries(errorAnalysis.error_counts).forEach(([errorKey, count]) => {
+                const n = typeof count === 'number' ? count : 0;
+                for (let i = 0; i < n; i += 1) {
+                    total += 1;
+                    const category = classifyBdErrorCategory(errorKey, {});
+                    if (category === 'env') envFlaky += 1;
+                    breakdown.push({ errorKey, category, layer: 'Unknown' });
+                }
+            });
+        }
+
+        if (total === 0 && typeof errorAnalysis.total_errors === 'number') {
+            total = errorAnalysis.total_errors;
+        }
+
+        return {
+            total,
+            envFlaky,
+            realDefects: Math.max(0, total - envFlaky),
+            breakdown
+        };
+    }
+
+    function getBdFixSuggestion(results = {}, fixSuggestions = {}) {
+        return fixSuggestions.fix_suggestion
+            || fixSuggestions?.phase3_fixes?.fix_suggestion
+            || results.phase3_fixes?.fix_suggestion
+            || {};
+    }
+
+    function extractBdMetrics(results = {}, fixSuggestions = {}, errorAnalysis = null) {
+        const fixSuggestion = getBdFixSuggestion(results, fixSuggestions);
+        const patchesGenerated = (fixSuggestion.code_patches || []).length;
+        const analysis = errorAnalysis
+            || results.error_analysis
+            || window.bdCurrentErrorAnalysis
+            || null;
+
+        let counts = countBdErrorsFromAnalysis(analysis);
+
+        if (counts.total === 0) {
+            const errorText = fixSuggestions.error_text
+                || results.error_message
+                || fixSuggestion.reason
+                || fixSuggestion.root_cause_analysis
+                || '';
+            const trimmed = String(errorText).trim();
+            if (trimmed && !/no errors? detected|analysis completed successfully/i.test(trimmed)) {
+                counts.total = 1;
+                const category = classifyBdErrorCategory('primary_error', { line: trimmed });
+                counts.envFlaky = category === 'env' ? 1 : 0;
+                counts.realDefects = category === 'real' ? 1 : 0;
+                counts.breakdown = [{ errorKey: 'primary_error', category, line: trimmed }];
+            }
+        }
+
+        window.bdErrorClassificationBreakdown = counts.breakdown || [];
+
+        return {
+            totalFailures: counts.total,
+            realDefects: counts.realDefects,
+            envFlaky: counts.envFlaky,
+            patchesGenerated
+        };
+    }
+
+    function updateBdMetrics(results = {}, fixSuggestions = {}, errorAnalysis = null) {
+        const metrics = extractBdMetrics(results, fixSuggestions, errorAnalysis);
+        const setText = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = String(value);
+        };
+        setText('bdKpiFailures', metrics.totalFailures);
+        setText('bdKpiDefects', metrics.realDefects);
+        setText('bdKpiEnv', metrics.envFlaky);
+        setText('bdKpiPatches', metrics.patchesGenerated);
+        window.bdCurrentMetrics = metrics;
+    }
+
+    function resetBdMetrics() {
+        window.bdCurrentErrorAnalysis = null;
+        window.bdErrorClassificationBreakdown = [];
+        window.bdCurrentMetrics = {
+            totalFailures: 0,
+            realDefects: 0,
+            envFlaky: 0,
+            patchesGenerated: 0
+        };
+        updateBdMetrics({}, {}, null);
+    }
+
+    async function fetchBdImpactErrorAnalysis(logFilePath) {
+        if (!logFilePath) return null;
+        try {
+            const formData = new FormData();
+            formData.append('log_file_path', logFilePath);
+            const response = await fetch('http://127.0.0.1:8000/api/error-fixing/impact-analysis', {
+                method: 'POST',
+                body: formData
+            });
+            if (!response.ok) return null;
+            const data = await response.json();
+            if (data.success && data.results) {
+                window.bdCurrentErrorAnalysis = data.results;
+                return data.results;
+            }
+        } catch (error) {
+            console.warn('Bug Discovery impact analysis for metrics failed:', error);
+        }
+        return null;
+    }
+
+    async function refreshBdMetricsForCurrentInstance() {
+        const results = window.bugDiscoveryResults || {};
+        const fixSuggestions = window.bugDiscoveryFixSuggestions || {};
+        const logPath = window.bugDiscoveryLogFilePath || getSelectedBugLogFilePath();
+
+        let errorAnalysis = results.error_analysis || window.bdCurrentErrorAnalysis || null;
+        if (!errorAnalysis && logPath) {
+            errorAnalysis = await fetchBdImpactErrorAnalysis(logPath);
+        }
+
+        updateBdMetrics(results, fixSuggestions, errorAnalysis);
+    }
+
     function updateBdProgressTrackerFromResults(fixSuggestions, analysisResult) {
         const tracker = document.getElementById('bdProgressTracker');
         if (!tracker) return;
@@ -1474,6 +2243,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Helpers
     function resetResultsArea() {
         setBdProgressTrackerState('pending');
+        resetBdMetrics();
         updateBdResultDetailsCounts();
         showBdAnalysisResultsPanel(false);
         if (bdAnalysisPlaceholder) {
@@ -1555,6 +2325,102 @@ document.addEventListener('DOMContentLoaded', () => {
             return direct.terminal_commands;
         }
         return [];
+    }
+
+    /** Prefer first non-empty array from candidates. */
+    function coalesceArrays(...candidates) {
+        for (const c of candidates) {
+            if (Array.isArray(c) && c.length > 0) return c;
+        }
+        return [];
+    }
+
+    /** Merge phase3_fixes (full RCA) with fix_suggestions.json (often partial). */
+    function mergeBugDiscoveryFixSuggestions(phase3Fixes, fixSuggestionsPayload) {
+        const p3 = phase3Fixes && typeof phase3Fixes === 'object' ? phase3Fixes : {};
+        const file = fixSuggestionsPayload && typeof fixSuggestionsPayload === 'object' ? fixSuggestionsPayload : {};
+        const p3Fix = p3.fix_suggestion && typeof p3.fix_suggestion === 'object' ? p3.fix_suggestion : {};
+        const fileFix = file.fix_suggestion && typeof file.fix_suggestion === 'object' ? file.fix_suggestion : {};
+        const fileLooksLikeFixSuggestion = !!(file.suspected_functions || file.code_patches
+            || file.root_cause_analysis || file.investigation_steps || file.investigation_commands);
+        const inlineFix = fileLooksLikeFixSuggestion ? file : {};
+
+        const mergedFixSuggestion = {
+            ...p3Fix,
+            ...fileFix,
+            ...inlineFix,
+            suspected_functions: coalesceArrays(
+                p3Fix.suspected_functions, fileFix.suspected_functions, inlineFix.suspected_functions
+            ),
+            suspected_configs: coalesceArrays(
+                p3Fix.suspected_configs, fileFix.suspected_configs, inlineFix.suspected_configs
+            ),
+            code_patches: coalesceArrays(
+                p3Fix.code_patches, fileFix.code_patches, inlineFix.code_patches
+            ),
+            config_patches: coalesceArrays(
+                p3Fix.config_patches, fileFix.config_patches, inlineFix.config_patches
+            ),
+            investigation_steps: coalesceArrays(
+                p3Fix.investigation_steps, fileFix.investigation_steps, inlineFix.investigation_steps
+            ),
+            investigation_commands: coalesceArrays(
+                p3Fix.investigation_commands, fileFix.investigation_commands, inlineFix.investigation_commands
+            )
+        };
+
+        const rootCause = p3Fix.root_cause_analysis || fileFix.root_cause_analysis || inlineFix.root_cause_analysis
+            || p3Fix.reason || fileFix.reason || inlineFix.reason
+            || p3Fix.detailed_root_cause || fileFix.detailed_root_cause || inlineFix.detailed_root_cause;
+        if (rootCause) {
+            mergedFixSuggestion.root_cause_analysis = rootCause;
+        }
+
+        return {
+            ...p3,
+            ...file,
+            error_text: p3.error_text || file.error_text || '',
+            fix_suggestion: mergedFixSuggestion,
+            terminal_commands: file.terminal_commands || p3.terminal_commands || null
+        };
+    }
+
+    /** Unified view for Result Details panels (radio categories). */
+    function getBugDiscoveryNormalizedContext() {
+        const results = window.bugDiscoveryResults || {};
+        const phase3FromResults = results.phase3_fixes || {};
+        const stored = window.bugDiscoveryFixSuggestions || {};
+        const fixSuggestions = mergeBugDiscoveryFixSuggestions(phase3FromResults, stored);
+        const fixSuggestion = { ...(fixSuggestions.fix_suggestion || {}) };
+        const phase2 = results.phase2_analysis || results.phase2_results || {};
+
+        if (!fixSuggestion.suspected_functions?.length && Array.isArray(phase2.suspected_functions)) {
+            fixSuggestion.suspected_functions = phase2.suspected_functions.map((f) => {
+                if (typeof f === 'string') return f;
+                return f.function_name || f.name || f;
+            }).filter(Boolean);
+        }
+        if (!fixSuggestion.suspected_configs?.length && Array.isArray(phase2.suspected_configs)) {
+            fixSuggestion.suspected_configs = phase2.suspected_configs.map((c) => {
+                if (typeof c === 'string') return c;
+                return c.config_name || c.param_name || c.name || c;
+            }).filter(Boolean);
+        }
+        if (!fixSuggestion.root_cause_analysis) {
+            fixSuggestion.root_cause_analysis = fixSuggestion.reason
+                || phase2.root_cause_analysis
+                || results.root_cause
+                || results.summary?.root_cause
+                || '';
+        }
+        if (!fixSuggestion.investigation_steps?.length && Array.isArray(phase2.investigation_steps)) {
+            fixSuggestion.investigation_steps = phase2.investigation_steps;
+        }
+        if (!fixSuggestion.code_patches?.length && Array.isArray(phase2.code_patches)) {
+            fixSuggestion.code_patches = phase2.code_patches;
+        }
+
+        return { results, fixSuggestions, fixSuggestion, phase2 };
     }
 
     function isDependencyOrVersionError(errorText, rootCauseText) {
@@ -1815,9 +2681,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // Get openair codebase name from working directory
         const openairCodebaseName = bugWorkingDir.split(/[/\\]/).pop() || 'openairinterface5g-develop';
         
-        // Show progress box instead of status bar
+        // Show progress box and place it below status toast if visible
         const fixCheckProgressBox = document.getElementById('fixCheckProgressBox');
         if (fixCheckProgressBox) {
+            const statusBar = document.getElementById('statusBar');
+            let progressTop = 80;
+            if (statusBar && statusBar.style.display !== 'none') {
+                const statusRect = statusBar.getBoundingClientRect();
+                progressTop = Math.max(progressTop, Math.round(statusRect.bottom + 12));
+            }
+            fixCheckProgressBox.style.top = `${progressTop}px`;
+            fixCheckProgressBox.style.right = '20px';
             fixCheckProgressBox.style.display = 'block';
         }
         
@@ -2612,9 +3486,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { value: 'impact-analysis', text: 'Impact analysis'}
     ];
 
-    function updateArtifactsDropdown(isCrashAnalysis) {
-        updateBdAnalysisArtifactRadios(isCrashAnalysis);
-
+    function updateArtifactsDropdown(_isCrashAnalysis) {
         const menu = document.getElementById('artifactsDropdownMenu');
         const hiddenInput = document.getElementById('artifactsDropdown');
         const labelEl = document.getElementById('artifactsDropdownBtnLabel');
@@ -2636,19 +3508,6 @@ document.addEventListener('DOMContentLoaded', () => {
             item.textContent = opt.text;
             menu.appendChild(item);
         });
-
-        if (isCrashAnalysis) {
-            [
-                { value: 'crash-details', text: 'Crash Details'},
-                { value: 'backtrace', text: 'Backtrace'}
-            ].forEach((opt) => {
-                const item = document.createElement('div');
-                item.className = 'dropdown-item';
-                item.setAttribute('data-value', opt.value);
-                item.textContent = opt.text;
-                menu.appendChild(item);
-            });
-        }
 
         const stillValid = currentSelection && Array.from(menu.querySelectorAll('.dropdown-item')).some(
             (el) =>el.getAttribute('data-value') === currentSelection
@@ -3106,7 +3965,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Store results globally for artifacts dropdown (matching how we store new RCA results)
         window.bugDiscoveryResults = results;
-        window.bugDiscoveryFixSuggestions = fixSuggestions;
+        window.bugDiscoveryFixSuggestions = mergeBugDiscoveryFixSuggestions(fixSuggestions, {});
         window.bugDiscoveryDeploymentContextExtended = analysis.deployment_context_extended || {};
         window.bugDiscoveryLogFilePath = analysis.log_path || null;
         window.crashAnalysisEnabled = crashAnalysisEnabled;
@@ -3476,6 +4335,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         updateBdProgressTrackerFromResults(fixSuggestions, results);
         revealBdPostAnalysisUi({ crashAnalysisEnabled, selectArtifact: 'error-detected'});
+        refreshBdMetricsForCurrentInstance();
     }
     
     // Event listeners for Bug Discovery History
@@ -3522,6 +4382,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     bugDiscoveryHistoryDropdown.classList.remove('active');
                 }
                 window.bugDiscoveryAnalysisFilename = filename;
+                // When switching the selected history item, reset KPIs/results
+                // until the user clicks "Load Previous Run".
+                resetResultsArea();
             }
         });
     }
@@ -4034,12 +4897,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Also store individual components for backward compatibility with existing code
                 window.bugDiscoveryResults = storedResults;
-                window.bugDiscoveryFixSuggestions = fixSuggestions;
+                window.bugDiscoveryFixSuggestions = mergeBugDiscoveryFixSuggestions(
+                    analysisResult.phase3_fixes || storedResults.phase3_fixes,
+                    fixSuggestions
+                );
                 window.crashAnalysisEnabled = crashAnalysisEnabled; // Store crash analysis state
                 window.bugDiscoveryDeploymentContextExtended = result.deployment_context_extended || {};
                 window.bugDiscoveryLogFilePath = logFilePath;
                 updateBdExportReportButton();
                 revealBdPostAnalysisUi({ crashAnalysisEnabled, selectArtifact: 'error-detected'});
+                refreshBdMetricsForCurrentInstance();
                 
                 // Save analysis to bug history (matching PyQt save_bug_analysis_to_history)
                 try {
@@ -4159,9 +5026,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             try {
-                const results = window.bugDiscoveryResults || {};
-                const fixSuggestions = window.bugDiscoveryFixSuggestions || {};
-                const fixSuggestion = fixSuggestions.fix_suggestion || {};
+                const { results, fixSuggestions, fixSuggestion, phase2 } = getBugDiscoveryNormalizedContext();
                 const isCrashAnalysis = window.crashAnalysisEnabled || false;
                 
                 // For crash analysis, also check result.crash_info and other crash-specific fields
@@ -4224,11 +5089,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
 
                     case 'root-cause-analysis': {
-                        const rootCauseText = fixSuggestion.reason
-                            || fixSuggestion.root_cause_analysis
+                        let rootCauseText = fixSuggestion.root_cause_analysis
+                            || fixSuggestion.reason
+                            || fixSuggestion.detailed_root_cause
+                            || phase2.root_cause_analysis
                             || results.root_cause
                             || results.summary?.root_cause
                             || '';
+                        if (!rootCauseText && results.error_message) {
+                            const err = String(results.error_message);
+                            if (/context:/i.test(err)) {
+                                rootCauseText = err.split(/context:/i).slice(1).join('Context:').trim();
+                            } else if (err.length > 120) {
+                                rootCauseText = err;
+                            }
+                        }
  htmlContent += `<div class="analysis-section"><h4>Root Cause Analysis</h4>`;
                         if (rootCauseText && String(rootCauseText).trim()) {
                             htmlContent += `
@@ -4255,35 +5130,50 @@ document.addEventListener('DOMContentLoaded', () => {
                         const phase2SuspectedFunctions = phase2AnalysisForFunctions.suspected_functions || [];
                         
                         // Map fix_suggestion functions to detailed data
-                        const suspectedFunctionsDetailed = fixSuggestionSuspectedFunctions.map((funcName) => {
-                            const funcNameStr = typeof funcName === 'string'? funcName : (funcName.name || funcName.function_name || 'Unknown');
-                            
-                            // Find matching function in code_patches
-                            const codePatch = codePatches.find(cp =>cp.function_name === funcNameStr);
-                            
-                            // Find matching function in phase2 data for additional details
-                            const phase2Func = phase2SuspectedFunctions.find(f => {
-                                const fName = typeof f === 'object'? (f.function_name || f.name) : f;
-                                return fName === funcNameStr;
-                            });
-                            
-                            // Get reason - prioritize phase2Func.reason, then codePatch.description, then 'N/A'
+                        const mapSuspectedFunctionRow = (funcName, phase2Func, codePatch) => {
+                            const funcNameStr = typeof funcName === 'string'
+                                ? funcName
+                                : (funcName.name || funcName.function_name || 'Unknown');
                             let reason = 'N/A';
-                            if (phase2Func && typeof phase2Func === 'object'&& phase2Func.reason) {
+                            if (phase2Func && typeof phase2Func === 'object' && phase2Func.reason) {
                                 reason = phase2Func.reason;
                             } else if (codePatch && codePatch.description) {
                                 reason = codePatch.description;
                             }
-                            
                             return {
                                 function_name: funcNameStr,
-                                file_path: codePatch ? (codePatch.file_path || 'N/A') : (phase2Func && typeof phase2Func === 'object'? (phase2Func.file_path || 'N/A') : 'N/A'),
-                                relevance_score: phase2Func && typeof phase2Func === 'object'? phase2Func.relevance_score : 'N/A',
-                                source: phase2Func && typeof phase2Func === 'object'? (phase2Func.source || 'N/A') : 'N/A',
-                                code_snippet: phase2Func && typeof phase2Func === 'object'? (phase2Func.code_snippet || '') : '',
-                                reason: reason
+                                file_path: codePatch ? (codePatch.file_path || 'N/A')
+                                    : (phase2Func && typeof phase2Func === 'object' ? (phase2Func.file_path || 'N/A') : 'N/A'),
+                                relevance_score: phase2Func && typeof phase2Func === 'object' ? phase2Func.relevance_score : 'N/A',
+                                source: phase2Func && typeof phase2Func === 'object' ? (phase2Func.source || 'N/A') : 'N/A',
+                                code_snippet: phase2Func && typeof phase2Func === 'object' ? (phase2Func.code_snippet || '') : '',
+                                reason
                             };
+                        };
+
+                        let suspectedFunctionsDetailed = fixSuggestionSuspectedFunctions.map((funcName) => {
+                            const funcNameStr = typeof funcName === 'string'
+                                ? funcName
+                                : (funcName.name || funcName.function_name || 'Unknown');
+                            const codePatch = codePatches.find((cp) => cp.function_name === funcNameStr);
+                            const phase2Func = phase2SuspectedFunctions.find((f) => {
+                                const fName = typeof f === 'object' ? (f.function_name || f.name) : f;
+                                return fName === funcNameStr;
+                            });
+                            return mapSuspectedFunctionRow(funcName, phase2Func, codePatch);
                         });
+
+                        if (!suspectedFunctionsDetailed.length && phase2SuspectedFunctions.length > 0) {
+                            suspectedFunctionsDetailed = phase2SuspectedFunctions.map((f) => {
+                                if (typeof f === 'object') {
+                                    const fn = f.function_name || f.name || 'Unknown';
+                                    const codePatch = codePatches.find((cp) => cp.function_name === fn);
+                                    return mapSuspectedFunctionRow(fn, f, codePatch);
+                                }
+                                const codePatch = codePatches.find((cp) => cp.function_name === f);
+                                return mapSuspectedFunctionRow(f, null, codePatch);
+                            });
+                        }
                         
                         htmlContent += `
                             <div class="analysis-section">
@@ -4393,9 +5283,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     case 'investigation-commands': {
-                        const invCommands = fixSuggestions.terminal_commands?.terminal_commands
-                            || results.phase4_commands?.terminal_commands
-                            || [];
+                        const invCommands = extractTerminalCommands(
+                            fixSuggestions.terminal_commands
+                            || results.phase4_commands
+                            || { terminal_commands: fixSuggestion.investigation_commands }
+                        );
  htmlContent += `<div class="analysis-section"><h4>Investigation Commands</h4>`;
                         if (invCommands.length > 0) {
                             htmlContent += `<table class="analysis-table"><thead><tr><th style="width:60px;">#</th><th>Command</th><th>Explanation</th></tr></thead><tbody>`;
@@ -5538,6 +6430,83 @@ document.addEventListener('DOMContentLoaded', function() {
     const ANALYSIS_SECTION_IDS = ['bug-discovery', 'code-evaluation', 'code-assistant'];
     const TOOL_SECTION_IDS = ['prompt-templates', 'user-history'];
 
+    function parseFirstInt(text) {
+        const m = String(text ?? '').match(/(\d+)/);
+        return m ? parseInt(m[1], 10) : 0;
+    }
+
+    function updateWorkbenchKpisFromPages() {
+        // Home KPI targets
+        const homeSpecValue = document.getElementById('homeKpiSpecValue');
+        const homeSpecMeta = document.getElementById('homeKpiSpecMeta');
+        const homeTsgValue = document.getElementById('homeKpiTsgValue');
+        const homeTsgMeta = document.getElementById('homeKpiTsgMeta');
+        const homeTeValue = document.getElementById('homeKpiTeValue');
+        const homeTePass = document.getElementById('homeKpiTePass');
+        const homeTeFail = document.getElementById('homeKpiTeFail');
+        const homeTeRun = document.getElementById('homeKpiTeRun');
+        const homeBdValue = document.getElementById('homeKpiBdValue');
+        const homeBdMeta = document.getElementById('homeKpiBdMeta');
+
+        // Spec Intelligence sources
+        const specSections = document.getElementById('specIntelMetricSections');
+        const specSectionsMeta = document.getElementById('specIntelMetricSectionsMeta');
+        if (homeSpecValue && specSections) homeSpecValue.textContent = (specSections.textContent || '0').trim();
+        if (homeSpecMeta && specSectionsMeta) homeSpecMeta.textContent = (specSectionsMeta.textContent || '').trim();
+
+        // Test Script Generator sources
+        const tsgSubtitle = document.getElementById('tsgResultSubtitle');
+        if (homeTsgValue && tsgSubtitle) {
+            const txt = (tsgSubtitle.textContent || '').trim();
+            const m = txt.match(/·\s*(\d+)\s*scripts?\b/i);
+            homeTsgValue.textContent = m ? m[1] : String(parseFirstInt(txt));
+        }
+        // Keep Home meta style but update language/framework if present.
+        if (homeTsgMeta && tsgSubtitle) {
+            const txt = (tsgSubtitle.textContent || '').trim();
+            const parts = txt.split('·').map(p => p.trim()).filter(Boolean);
+            // Expected: ["AI-generated test script", "0 scripts", "Python", "pytest"]
+            const lang = parts[2];
+            const fw = parts[3];
+            if (lang && fw) {
+                // Preserve "Run #0 ·" prefix if already present
+                const prefix = (homeTsgMeta.textContent || '').includes('Run') ? (homeTsgMeta.textContent || '').split('·')[0].trim() : 'Run #0';
+                homeTsgMeta.textContent = `${prefix} · ${lang} · ${fw}`;
+            }
+        }
+
+        // Test Execution sources
+        const teTestsRun = document.getElementById('teKpiTestsRun');
+        const tePassed = document.getElementById('teKpiPassed');
+        const teFailed = document.getElementById('teKpiFailed');
+        const teRun = document.getElementById('teMetaRun');
+        if (homeTeValue && teTestsRun) homeTeValue.textContent = (teTestsRun.textContent || '0').trim();
+        if (homeTePass && tePassed) homeTePass.textContent = `${parseFirstInt(tePassed.textContent)} pass`;
+        if (homeTeFail && teFailed) homeTeFail.textContent = `${parseFirstInt(teFailed.textContent)} fail`;
+        if (homeTeRun && teRun) {
+            const runTxt = (teRun.textContent || '').trim();
+            const runNum = runTxt.startsWith('#') ? runTxt.slice(1) : runTxt.replace(/^Run\s*#?/i, '');
+            homeTeRun.textContent = `Run #${runNum || '0'}`;
+        }
+
+        // Bug Discovery sources
+        const bdFailures = document.getElementById('bdKpiFailures');
+        const bdDefects = document.getElementById('bdKpiDefects');
+        const bdPatches = document.getElementById('bdKpiPatches');
+        if (homeBdValue && bdFailures) homeBdValue.textContent = (bdFailures.textContent || '0').trim();
+        if (homeBdMeta && (bdDefects || bdPatches)) {
+            const defects = parseFirstInt(bdDefects?.textContent);
+            const patches = parseFirstInt(bdPatches?.textContent);
+            homeBdMeta.textContent = `${defects} real defects · ${patches} patches generated`;
+        }
+    }
+
+    function observeTextChanges(el, cb) {
+        if (!el) return;
+        const observer = new MutationObserver(() => cb());
+        observer.observe(el, { childList: true, subtree: true, characterData: true });
+    }
+
     function updateNavActiveState(sectionId) {
         document.querySelectorAll('.nav-top-link, .nav-sub-link').forEach(el =>el.classList.remove('active'));
         document.querySelectorAll('.nav-group').forEach(group => {
@@ -5587,6 +6556,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (sectionId === 'test-script-generator'&& typeof loadTestPromptTemplates === 'function') {
             loadTestPromptTemplates().catch(err => {
                 console.warn('⚠️ Failed to load templates via navigation:', err);
+            });
+        }
+        if (sectionId === 'prompt-templates' && typeof loadTestPromptTemplates === 'function') {
+            loadTestPromptTemplates().catch(err => {
+                console.warn('⚠️ Failed to load templates for Prompt Studio:', err);
             });
         }
         if (sectionId === 'user-history'&& typeof initializeUserHistoryDropdowns === 'function') {
@@ -5656,7 +6630,22 @@ document.addEventListener('DOMContentLoaded', function() {
     window.navigateToAppSection = function (sectionId) {
         _navigateToAppSectionOriginal(sectionId);
         updateWorkbenchTopTabs(sectionId);
+        // Keep Home KPIs in sync when navigating.
+        updateWorkbenchKpisFromPages();
     };
+
+    // Initial KPI sync + realtime sync when source KPIs update
+    updateWorkbenchKpisFromPages();
+    observeTextChanges(document.getElementById('specIntelMetricSections'), updateWorkbenchKpisFromPages);
+    observeTextChanges(document.getElementById('specIntelMetricSectionsMeta'), updateWorkbenchKpisFromPages);
+    observeTextChanges(document.getElementById('tsgResultSubtitle'), updateWorkbenchKpisFromPages);
+    observeTextChanges(document.getElementById('teKpiTestsRun'), updateWorkbenchKpisFromPages);
+    observeTextChanges(document.getElementById('teKpiPassed'), updateWorkbenchKpisFromPages);
+    observeTextChanges(document.getElementById('teKpiFailed'), updateWorkbenchKpisFromPages);
+    observeTextChanges(document.getElementById('teMetaRun'), updateWorkbenchKpisFromPages);
+    observeTextChanges(document.getElementById('bdKpiFailures'), updateWorkbenchKpisFromPages);
+    observeTextChanges(document.getElementById('bdKpiDefects'), updateWorkbenchKpisFromPages);
+    observeTextChanges(document.getElementById('bdKpiPatches'), updateWorkbenchKpisFromPages);
     
     // Handle Back Button click (return to landing page/homepage)
     const backButton = document.getElementById('backButton');
@@ -5713,11 +6702,116 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentFileId = null;
     let currentJobId = null;
     let currentDatasetFolderPath = null; // CRITICAL: Declare early to avoid "before initialization"error
+    let currentTotalContentFilePath = null; // total_content.txt from last successful extraction
+    let specIntelBackendExtractRoot = null; // absolute Backend/resources/extract from API or Electron
+
+    function isAbsoluteFilesystemPath(p) {
+        if (!p) return false;
+        const s = String(p);
+        return s.startsWith('/') || /^[A-Za-z]:[\\/]/.test(s);
+    }
+
+    function normalizeDatasetFilesystemPath(inputPath) {
+        if (!inputPath) return null;
+        let p = String(inputPath).replace(/\\/g, '/').trim();
+        if (isAbsoluteFilesystemPath(p)) return p;
+
+        const rel = p.replace(/^\.?\//, '').replace(/^extract\//, '').replace(/^resources\/extract\//, '');
+        const bases = [];
+
+        if (workingDirectory) {
+            bases.push(String(workingDirectory).replace(/\\/g, '/').replace(/\/$/, ''));
+        }
+        if (specIntelBackendExtractRoot) {
+            bases.push(String(specIntelBackendExtractRoot).replace(/\\/g, '/').replace(/\/$/, ''));
+        }
+
+        for (const base of bases) {
+            if (!base || !isAbsoluteFilesystemPath(base)) continue;
+            if (rel.startsWith('datasets/')) {
+                return `${base}/${rel}`;
+            }
+            return `${base}/${rel}`;
+        }
+
+        return p;
+    }
+
+    function buildDatasetFolderPathFromSelection() {
+        const subsection = selectedSubsection;
+        if (!subsection) return null;
+        let base = null;
+        if (specIntelBackendExtractRoot && isAbsoluteFilesystemPath(specIntelBackendExtractRoot)) {
+            base = specIntelBackendExtractRoot.replace(/\/$/, '');
+        } else if (workingDirectory) {
+            base = normalizeDatasetFilesystemPath(workingDirectory);
+        }
+        if (!base || !isAbsoluteFilesystemPath(base)) return null;
+        return `${base.replace(/\/$/, '')}/datasets/${subsection}`;
+    }
+
+    function buildTotalContentFilePathFromSelection() {
+        const folder = currentDatasetFolderPath
+            ? normalizeDatasetFilesystemPath(currentDatasetFolderPath)
+            : buildDatasetFolderPathFromSelection();
+        if (folder) {
+            return `${folder.replace(/\/$/, '')}/total_content.txt`;
+        }
+        const direct = normalizeDatasetFilesystemPath(currentTotalContentFilePath);
+        if (direct) return direct;
+        return null;
+    }
+
+    /** Count all files in the dataset output folder (clause files + total_content + section file, etc.). */
+    async function countDatasetFolderEntries(folderPath) {
+        const resolved = normalizeDatasetFilesystemPath(folderPath);
+        if (!resolved) return 0;
+        try {
+            if (window.API?.listFilesInDirectory) {
+                const entries = await window.API.listFilesInDirectory(resolved);
+                if (Array.isArray(entries)) {
+                    return entries.length;
+                }
+            }
+        } catch (err) {
+            console.warn('Could not count dataset folder files:', err);
+        }
+        return 0;
+    }
 
     const sectionDropdown = document.getElementById('sectionDropdown');
     const subsectionDropdown = document.getElementById('subsectionDropdown');
     const sectionBtn = document.getElementById('sectionBtn');
     const subsectionBtn = document.getElementById('subsectionBtn');
+
+    function setSpecIntelMetricValue(id, value) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = String(value ?? 0);
+    }
+
+    function setSpecIntelText(id, text) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = String(text ?? '');
+    }
+
+    function setSpecIntelAvailableBadge(count) {
+        const badge = document.getElementById('specIntelAvailableBadge');
+        if (!badge) return;
+        const n = Number.isFinite(count) ? count : 0;
+        badge.textContent = `${n} available`;
+    }
+
+    function resetSpecIntelMetrics() {
+        setSpecIntelMetricValue('specIntelMetricSections', 0);
+        setSpecIntelMetricValue('specIntelMetricSubsections', 0);
+        setSpecIntelMetricValue('specIntelMetricDatasetEntries', 0);
+        setSpecIntelText('specIntelMetricSectionsMeta', 'from 0 spec documents');
+        setSpecIntelAvailableBadge(0);
+    }
+
+    resetSpecIntelMetrics();
 
     function bindSpecIntelPlaceholderButtons() {
         const specIntelSection = document.getElementById('dataset-generator');
@@ -5737,7 +6831,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateSpecIntelDocumentUI(loaded, fileName) {
         const documentTextEl = document.getElementById('documentText');
-        const documentStatusEl = document.getElementById('documentStatus');
         const documentFieldGroup = document.getElementById('documentFieldGroup');
         if (!documentTextEl) return;
         if (loaded) {
@@ -5745,47 +6838,78 @@ document.addEventListener('DOMContentLoaded', function() {
             documentTextEl.style.color = '';
             documentTextEl.classList.add('spec-intel-field-value--loaded');
             documentFieldGroup?.classList.add('spec-intel-field--loaded');
-            if (documentStatusEl) documentStatusEl.style.display = '';
         } else {
             documentTextEl.textContent = 'No file selected';
             documentTextEl.classList.remove('spec-intel-field-value--loaded');
             documentFieldGroup?.classList.remove('spec-intel-field--loaded');
-            if (documentStatusEl) documentStatusEl.style.display = 'none';
         }
     }
 
-    // Set default directories (using project structure)
-    // Project root: C:\Users\ChanduVangala\Desktop\RCA_Electron-main\RCA_Electron-main
-    const defaultWorkingDir = 'C:\\Users\\ChanduVangala\\Desktop\\RCA_Electron-main\\RCA_Electron-main\\Backend\\resources\\extract';
-    const defaultOutputDir = 'C:\\Users\\ChanduVangala\\Desktop\\RCA_Electron-main\\RCA_Electron-main\\Backend\\resources\\output';
-    // Initialize default directories on page load
+    // Initialize extract/output directories from backend (absolute paths under Backend/)
     async function initializeDefaultDirectories() {
+        let defaultWorkingDir = null;
+        let defaultOutputDir = null;
+
         try {
-            // Set working directory
-            await window.API.setWorkingDirectory(defaultWorkingDir);
-            workingDirectory = defaultWorkingDir;
+            if (window.API?.getExtractFolderPath) {
+                const pathInfo = await window.API.getExtractFolderPath();
+                if (pathInfo?.success && pathInfo.extract_path) {
+                    defaultWorkingDir = pathInfo.extract_path.replace(/\\/g, '/');
+                    specIntelBackendExtractRoot = defaultWorkingDir;
+                    defaultOutputDir = defaultWorkingDir.replace(/\/extract\/?$/, '/output');
+                }
+            }
+        } catch (err) {
+            console.warn('Could not fetch extract folder path from backend:', err);
+        }
+
+        if (!defaultWorkingDir && window.API?.getBackendExtractRoot) {
+            try {
+                const rootInfo = await window.API.getBackendExtractRoot();
+                if (rootInfo?.success && rootInfo.extractRoot) {
+                    defaultWorkingDir = rootInfo.extractRoot.replace(/\\/g, '/');
+                    specIntelBackendExtractRoot = defaultWorkingDir;
+                    defaultOutputDir = defaultWorkingDir.replace(/\/extract\/?$/, '/output');
+                }
+            } catch (err) {
+                console.warn('Could not get Backend extract root from Electron:', err);
+            }
+        }
+
+        if (!defaultWorkingDir) {
+            console.warn('Using fallback extract paths — configure Source Directory if extraction fails');
+            defaultWorkingDir = null;
+            defaultOutputDir = null;
+        }
+
+        try {
+            if (defaultWorkingDir) {
+                await window.API.setWorkingDirectory(defaultWorkingDir);
+                workingDirectory = defaultWorkingDir;
+            }
             const workingDirText = document.getElementById('workingDirText');
-            if (workingDirText) {
-                workingDirText.textContent = `Default: ${defaultWorkingDir}`;
+            if (workingDirText && defaultWorkingDir) {
+                workingDirText.textContent = defaultWorkingDir;
                 workingDirText.style.color = '#10b981';
+                workingDirText.title = defaultWorkingDir;
             }
 
-            // Set output directory
-            await window.API.setOutputDirectory(defaultOutputDir);
-            outputDirectory = defaultOutputDir;
-            const outputDirText = document.getElementById('outputDirText');
-            if (outputDirText) {
-                outputDirText.textContent = `Default: ${defaultOutputDir}`;
-                outputDirText.style.color = '#10b981';
+            if (defaultOutputDir) {
+                await window.API.setOutputDirectory(defaultOutputDir);
+                outputDirectory = defaultOutputDir;
             }
-            
-            console.log('Default directories initialized:', { workingDirectory, outputDirectory });
+            const outputDirText = document.getElementById('outputDirText');
+            if (outputDirText && defaultOutputDir) {
+                outputDirText.textContent = defaultOutputDir;
+                outputDirText.style.color = '#10b981';
+                outputDirText.title = defaultOutputDir;
+            }
+
+            console.log('Default directories initialized:', { workingDirectory, outputDirectory, specIntelBackendExtractRoot });
         } catch (error) {
             console.error('Error initializing default directories:', error);
-            // Set directories even if API calls fail
-            workingDirectory = defaultWorkingDir;
-            outputDirectory = defaultOutputDir;
-            console.log('Directories set to defaults despite API error:', { workingDirectory, outputDirectory });
+            if (defaultWorkingDir) workingDirectory = defaultWorkingDir;
+            if (defaultOutputDir) outputDirectory = defaultOutputDir;
         }
     }
 
@@ -6010,7 +7134,22 @@ document.addEventListener('DOMContentLoaded', function() {
                             console.log('[app.js] ✅ Direct fetch getDocumentSections successful, result:', sections);
                         }
                         
-                    updateSectionDropdown(sections.sections);
+                    const sectionList = Array.isArray(sections?.sections) ? sections.sections : [];
+                    updateSectionDropdown(sectionList);
+
+                    // Real-time metrics: sections count after document load
+                    setSpecIntelMetricValue('specIntelMetricSections', sectionList.length);
+                    setSpecIntelText('specIntelMetricSectionsMeta', 'from 1 spec document');
+                    setSpecIntelAvailableBadge(sectionList.length);
+
+                    // Reset subsections metric until a section is chosen
+                    setSpecIntelMetricValue('specIntelMetricSubsections', 0);
+                    selectedSubsection = null;
+                    if (subsectionBtn) {
+                        const span = subsectionBtn.querySelector('span');
+                        if (span) span.textContent = 'Choose Subsection';
+                    }
+                    updateSubsectionDropdown([]);
                     
                     // Hide section progress indicator
                     hideSectionProgress();
@@ -6065,16 +7204,83 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!subsectionDropdown) return;
         const subsectionContent = subsectionDropdown.querySelector('.dropdown-content');
         
-        if (subsectionContent) {
-            subsectionContent.innerHTML = '';
-            subsections.forEach(subsection => {
-                const item = document.createElement('div');
-                item.className = 'dropdown-item';
-                item.textContent = subsection;
-                item.setAttribute('data-subsection', subsection);
-                subsectionContent.appendChild(item);
+        if (!subsectionContent) return;
+
+        subsectionContent.innerHTML = '';
+        if (!Array.isArray(subsections) || subsections.length === 0) return;
+
+        // Build in a fragment to reduce reflow when subsections are large
+        const frag = document.createDocumentFragment();
+        subsections.forEach(subsection => {
+            const item = document.createElement('div');
+            item.className = 'dropdown-item';
+            item.textContent = subsection;
+            item.setAttribute('data-subsection', subsection);
+            frag.appendChild(item);
+        });
+        subsectionContent.appendChild(frag);
+    }
+
+    // Spec Intel: cache subsections per (fileId, section) to avoid repeated slow calls
+    const specIntelSubsectionsCache = new Map(); // key => Promise<Array<string>>
+    let specIntelSubsectionLoadSeq = 0;
+
+    function firstFulfilled(promises) {
+        return new Promise((resolve, reject) => {
+            let pending = promises.length;
+            let lastErr;
+            promises.forEach((p) => {
+                Promise.resolve(p).then(resolve).catch((err) => {
+                    lastErr = err;
+                    pending--;
+                    if (pending === 0) reject(lastErr);
+                });
             });
+        });
+    }
+
+    async function getSubsectionsForSectionCached(fileId, section) {
+        const cacheKey = `${fileId}::${section}`;
+        if (specIntelSubsectionsCache.has(cacheKey)) {
+            return specIntelSubsectionsCache.get(cacheKey);
         }
+
+        const loadPromise = (async () => {
+            const normalize = (res) => {
+                if (Array.isArray(res)) return res;
+                if (res && Array.isArray(res.subsections)) return res.subsections;
+                return [];
+            };
+
+            const promises = [];
+
+            // Prefer window.API if present, but race with direct fetch to reduce wait time.
+            if (window.API && typeof window.API.getDocumentSubsections === 'function') {
+                promises.push(window.API.getDocumentSubsections(fileId, section).then(normalize));
+            }
+
+            const encodedSection = encodeURIComponent(section);
+            promises.push(
+                fetch(`http://127.0.0.1:8000/api/dataset/document-subsections/${fileId}/${encodedSection}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                    .then(async (response) => {
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                        }
+                        return response.json();
+                    })
+                    .then(normalize)
+            );
+
+            const resolved = await firstFulfilled(promises);
+            return Array.isArray(resolved) ? resolved : [];
+        })();
+
+        specIntelSubsectionsCache.set(cacheKey, loadPromise);
+        return loadPromise;
     }
 
     // Extract button is now always visible in Box 2
@@ -6183,44 +7389,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Get subsections for this section
                 if (currentFileId) {
+                    const loadSeq = ++specIntelSubsectionLoadSeq;
+
+                    // Reset subsection selection immediately when section changes
+                    selectedSubsection = null;
+                    if (subsectionBtn) {
+                        const span = subsectionBtn.querySelector('span');
+                        if (span) span.textContent = 'Choose Subsection';
+                    }
+                    updateSubsectionDropdown([]);
+
                     try {
-                        // Show subsection progress indicator
                         showSubsectionProgress();
-                        
-                        let subsections;
-                        // Try window.API.getDocumentSubsections first, fallback to direct fetch
-                        if (window.API && typeof window.API.getDocumentSubsections === 'function') {
-                            console.log('[app.js] ✅ Using window.API.getDocumentSubsections');
-                            subsections = await window.API.getDocumentSubsections(currentFileId, section);
-                        } else {
-                            console.warn('[app.js] ⚠️ window.API.getDocumentSubsections not available, using direct fetch call');
-                            // Fallback to direct fetch
-                            const encodedSection = encodeURIComponent(section);
-                            const response = await fetch(`http://127.0.0.1:8000/api/dataset/document-subsections/${currentFileId}/${encodedSection}`, {
-                                method: 'GET',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                }
-                            });
-                            
-                            if (!response.ok) {
-                                const errorText = await response.text();
-                                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
-                            }
-                            
-                            subsections = await response.json();
-                            console.log('[app.js] ✅ Direct fetch getDocumentSubsections successful, result:', subsections);
-                        }
-                        updateSubsectionDropdown(subsections.subsections);
-                        
-                        // Hide subsection progress indicator
-                        hideSubsectionProgress();
-                        
-                        // Section changed, loading subsections
+
+                        const subsections = await getSubsectionsForSectionCached(currentFileId, section);
+
+                        // Ignore stale responses when the user picked another section quickly
+                        if (loadSeq !== specIntelSubsectionLoadSeq) return;
+
+                        updateSubsectionDropdown(subsections);
+
+                        // Real-time metrics: subsections count for selected section
+                        setSpecIntelMetricValue('specIntelMetricSubsections', Array.isArray(subsections) ? subsections.length : 0);
+                        setSpecIntelAvailableBadge(Array.isArray(subsections) ? subsections.length : 0);
                     } catch (error) {
                         console.error('Error getting subsections:', error);
-                        hideSubsectionProgress();
-                        showStatusBar('Failed to load subsections', 'error');
+                        if (loadSeq === specIntelSubsectionLoadSeq) {
+                            showStatusBar('Failed to load subsections', 'error');
+                        }
+                    } finally {
+                        if (loadSeq === specIntelSubsectionLoadSeq) {
+                            hideSubsectionProgress();
+                        }
                     }
                 }
             }
@@ -6395,7 +7595,52 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Show the "Open Dataset"button after successful extraction
                     console.log('📁 Final dataset folder path:', datasetFolderPath);
                     console.log('📁 Calling showOpenDatasetButton with path:', datasetFolderPath);
+                    const resolvedFolder = normalizeDatasetFilesystemPath(datasetFolderPath);
+                    if (resolvedFolder) {
+                        datasetFolderPath = resolvedFolder;
+                    }
                     showOpenDatasetButton(datasetFolderPath);
+
+                    // Store absolute paths under Backend/resources/extract for Send → TSG
+                    const normalizedFolder = datasetFolderPath
+                        ? datasetFolderPath.replace(/\\/g, '/').replace(/\/$/, '')
+                        : buildDatasetFolderPathFromSelection();
+                    if (normalizedFolder) {
+                        currentDatasetFolderPath = normalizedFolder;
+                    }
+
+                    const rawTotalContent = (
+                        result.total_content_file
+                        || result.files_created?.total_content
+                        || (normalizedFolder ? `${normalizedFolder}/total_content.txt` : null)
+                    );
+                    currentTotalContentFilePath = normalizeDatasetFilesystemPath(rawTotalContent)
+                        || (normalizedFolder ? `${normalizedFolder}/total_content.txt` : null);
+
+                    // Real-time metrics: total files in dataset folder (not clause_files only)
+                    let entriesCount = 0;
+                    if (normalizedFolder) {
+                        entriesCount = await countDatasetFolderEntries(normalizedFolder);
+                    }
+                    if (!entriesCount) {
+                        const clauseFiles = Array.isArray(result?.files_created?.clause_files)
+                            ? result.files_created.clause_files
+                            : null;
+                        const mainFiles = result?.files_created
+                            ? ['initial_text', 'total_content', 'graph_json'].filter(
+                                (k) => result.files_created[k]
+                            ).length
+                            : 0;
+                        entriesCount = clauseFiles
+                            ? clauseFiles.length + mainFiles
+                            : (Number(
+                                result?.dataset_entries_count
+                                ?? result?.entries_count
+                                ?? result?.clause_files_count
+                                ?? 0
+                            ) || 0);
+                    }
+                    setSpecIntelMetricValue('specIntelMetricDatasetEntries', entriesCount);
                     
                     console.log('📁 Dataset folder path stored in currentDatasetFolderPath:', currentDatasetFolderPath);
                 } else {
@@ -6406,6 +7651,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 hideProgressBar();
                 showStatusBar('Failed to generate dataset: '+ error.message, 'error');
                 console.error('Generation error:', error);
+            }
+        });
+    }
+
+    const specIntelSendToTsgBtn = document.getElementById('specIntelSendToTsgBtn');
+    if (specIntelSendToTsgBtn) {
+        specIntelSendToTsgBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof window.sendDatasetToTestScriptGenerator === 'function') {
+                await window.sendDatasetToTestScriptGenerator();
+            } else {
+                showStatusBar('Send to Test Script Generator is not ready yet. Please try again.', 'warning');
             }
         });
     }
@@ -6428,10 +7686,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Next Button - Navigate from Test Script Generator to Test Deployment
-    const testScriptGeneratorNextBtn = document.getElementById('testScriptGeneratorNextBtn');
-    if (testScriptGeneratorNextBtn) {
-        testScriptGeneratorNextBtn.addEventListener('click', function() {
+    const testScriptGeneratorNavNextBtn = document.getElementById('testScriptGeneratorNavNextBtn');
+    if (testScriptGeneratorNavNextBtn) {
+        testScriptGeneratorNavNextBtn.addEventListener('click', function() {
             navigateToAppSection('test-deployment');
         });
     }
@@ -6445,11 +7702,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Next Button - Navigate from Test Deployment to Test Execution
+    function goToTestExecutionSection() {
+        navigateToAppSection('test-execution');
+    }
+
     const testDeploymentNextBtn = document.getElementById('testDeploymentNextBtn');
     if (testDeploymentNextBtn) {
-        testDeploymentNextBtn.addEventListener('click', function() {
-            navigateToAppSection('test-execution');
-        });
+        testDeploymentNextBtn.addEventListener('click', goToTestExecutionSection);
+    }
+
+    const testDeploymentNavNextBtn = document.getElementById('testDeploymentNavNextBtn');
+    if (testDeploymentNavNextBtn) {
+        testDeploymentNavNextBtn.addEventListener('click', goToTestExecutionSection);
     }
 
     const testExecutionNextBtn = document.getElementById('testExecutionNextBtn');
@@ -6889,6 +8153,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let userHistoryFilters = { ...USER_HISTORY_DEFAULTS };
     let userHistoryLoading = false;
     let userHistoryRetryTimer = null;
+    let userHistoryDisplayedEntries = [];
+    const USER_HISTORY_TIMELINE_LIMIT = 10;
 
     function ensureUserHistoryDropdownOptions(force = false) {
         // Get elements fresh each time to ensure they exist
@@ -7086,28 +8352,28 @@ document.addEventListener('DOMContentLoaded', function() {
         const promptText = prompt || '';
         
         return `
-            <div class="history-entry-card"style="background-color:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:0;margin-bottom:1.25rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);overflow:hidden;max-width:100%;width:100%;box-sizing:border-box;">
-                <div style="background-color:#f8fafc;padding:0.75rem;border-bottom:2px solid #e2e8f0;max-width:100%;box-sizing:border-box;">
-                    <div style="text-align:center;max-width:100%;">
-                        <div style="color:#5d92ff;font-size:1.1rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;word-break:break-word;overflow-wrap:break-word;">${escapeHtml(activityLabel)}</div>
+            <div class="history-entry-card history-entry-card--compact" style="background-color:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:0;margin-bottom:1.25rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);overflow:hidden;max-width:100%;width:100%;box-sizing:border-box;">
+                <div class="history-entry-card__head">
+                    <div class="history-entry-card__head-inner">
+                        <div class="history-entry-card__title">${escapeHtml(activityLabel)}</div>
                     </div>
                 </div>
-                <div style="padding:1rem;max-width:100%;box-sizing:border-box;overflow-x:auto;">
-                    <table style="width:100%;border-collapse:collapse;table-layout:fixed;word-wrap:break-word;word-break:break-word;max-width:100%;box-sizing:border-box;">
+                <div class="history-entry-card__body">
+                    <table class="history-entry-card__table">
                         <tbody>
-                            <tr style="border-bottom:1px solid #e2e8f0;">
-                                <td style="width:30%;padding:0.75rem;font-weight:600;color:#5d92ff;vertical-align:top;word-break:break-word;overflow-wrap:break-word;background-color:#f8fafc;">Time of Creation</td>
-                                <td style="width:70%;padding:0.75rem;color:#1f2937;vertical-align:top;word-break:break-word;overflow-wrap:break-word;font-family:'Times New Roman',Times,serif;white-space:pre-wrap;">${escapeHtml(timestampLabel)}</td>
+                            <tr>
+                                <td class="history-entry-card__label">Time of Creation</td>
+                                <td class="history-entry-card__value history-entry-card__value--pre">${escapeHtml(timestampLabel)}</td>
                             </tr>
-                            <tr style="border-bottom:1px solid #e2e8f0;">
-                                <td style="width:30%;padding:0.75rem;font-weight:600;color:#5d92ff;vertical-align:top;word-break:break-word;overflow-wrap:break-word;background-color:#f8fafc;">Prompt</td>
-                                <td style="width:70%;padding:0.75rem;color:#1f2937;vertical-align:top;word-break:break-word;overflow-wrap:break-word;font-family:'Times New Roman',Times,serif;">
+                            <tr>
+                                <td class="history-entry-card__label">Prompt</td>
+                                <td class="history-entry-card__value">
                                     <div style="max-height:300px;overflow-y:auto;overflow-x:hidden;white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;max-width:100%;box-sizing:border-box;">${escapeHtml(promptText)}</div>
                                 </td>
                             </tr>
                             <tr>
-                                <td style="width:30%;padding:0.75rem;font-weight:600;color:#5d92ff;vertical-align:top;word-break:break-word;overflow-wrap:break-word;background-color:#f8fafc;">Generated Output</td>
-                                <td style="width:70%;padding:0.75rem;color:#1f2937;vertical-align:top;word-break:break-word;overflow-wrap:break-word;font-family:'Times New Roman',Times,serif;">
+                                <td class="history-entry-card__label">Generated Output</td>
+                                <td class="history-entry-card__value">
                                     <div style="max-height:400px;overflow-y:auto;overflow-x:hidden;white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;max-width:100%;box-sizing:border-box;">${escapeHtml(outputText)}</div>
                                 </td>
                             </tr>
@@ -7177,38 +8443,38 @@ document.addEventListener('DOMContentLoaded', function() {
         const errorDisplay = (errorText && errorText.trim() !== '') ? errorText : 'No error information available';
         
         return `
-            <div class="history-entry-card"style="background-color:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:0;margin-bottom:1.25rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);overflow:hidden;max-width:100%;width:100%;box-sizing:border-box;">
-                <div style="background-color:#f8fafc;padding:0.75rem;border-bottom:2px solid #e2e8f0;max-width:100%;box-sizing:border-box;">
-                    <div style="text-align:center;max-width:100%;">
-                        <div style="color:#5d92ff;font-size:1.1rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;word-break:break-word;overflow-wrap:break-word;">${escapeHtml(activityLabel)}</div>
+            <div class="history-entry-card history-entry-card--compact" style="background-color:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:0;margin-bottom:1.25rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);overflow:hidden;max-width:100%;width:100%;box-sizing:border-box;">
+                <div class="history-entry-card__head">
+                    <div class="history-entry-card__head-inner">
+                        <div class="history-entry-card__title">${escapeHtml(activityLabel)}</div>
                     </div>
                 </div>
-                <div style="padding:1rem;max-width:100%;box-sizing:border-box;overflow-x:auto;">
-                    <table style="width:100%;border-collapse:collapse;table-layout:fixed;word-wrap:break-word;word-break:break-word;max-width:100%;box-sizing:border-box;">
+                <div class="history-entry-card__body">
+                    <table class="history-entry-card__table">
                         <tbody>
-                            <tr style="border-bottom:1px solid #e2e8f0;">
-                                <td style="width:30%;padding:0.75rem;font-weight:600;color:#5d92ff;vertical-align:top;word-break:break-word;overflow-wrap:break-word;background-color:#f8fafc;">Time of Creation</td>
-                                <td style="width:70%;padding:0.75rem;color:#1f2937;vertical-align:top;word-break:break-word;overflow-wrap:break-word;font-family:'Times New Roman',Times,serif;white-space:pre-wrap;">${escapeHtml(timestampLabel)}</td>
-                            </tr>
-                            <tr style="border-bottom:1px solid #e2e8f0;">
-                                <td style="width:30%;padding:0.75rem;font-weight:600;color:#5d92ff;vertical-align:top;word-break:break-word;overflow-wrap:break-word;background-color:#f8fafc;">Error</td>
-                                <td style="width:70%;padding:0.75rem;color:#1f2937;vertical-align:top;word-break:break-word;overflow-wrap:break-word;font-family:'Times New Roman',Times,serif;white-space:pre-wrap;">${escapeHtml(errorDisplay)}</td>
-                            </tr>
-                            <tr style="border-bottom:1px solid #e2e8f0;">
-                                <td style="width:30%;padding:0.75rem;font-weight:600;color:#5d92ff;vertical-align:top;word-break:break-word;overflow-wrap:break-word;background-color:#f8fafc;">Log File Name</td>
-                                <td style="width:70%;padding:0.75rem;color:#1f2937;vertical-align:top;word-break:break-word;overflow-wrap:break-word;font-family:'Times New Roman',Times,serif;white-space:pre-wrap;">${escapeHtml(logFileName)}</td>
-                            </tr>
-                            <tr style="border-bottom:1px solid #e2e8f0;">
-                                <td style="width:30%;padding:0.75rem;font-weight:600;color:#5d92ff;vertical-align:top;word-break:break-word;overflow-wrap:break-word;background-color:#f8fafc;">Suspected Functions</td>
-                                <td style="width:70%;padding:0.75rem;color:#1f2937;vertical-align:top;word-break:break-word;overflow-wrap:break-word;font-family:'Times New Roman',Times,serif;white-space:pre-wrap;">${escapeHtml(suspectedFunctionsDisplay)}</td>
-                            </tr>
-                            <tr style="border-bottom:1px solid #e2e8f0;">
-                                <td style="width:30%;padding:0.75rem;font-weight:600;color:#5d92ff;vertical-align:top;word-break:break-word;overflow-wrap:break-word;background-color:#f8fafc;">Suspected Configs</td>
-                                <td style="width:70%;padding:0.75rem;color:#1f2937;vertical-align:top;word-break:break-word;overflow-wrap:break-word;font-family:'Times New Roman',Times,serif;white-space:pre-wrap;">${escapeHtml(suspectedConfigsDisplay)}</td>
+                            <tr>
+                                <td class="history-entry-card__label">Time of Creation</td>
+                                <td class="history-entry-card__value history-entry-card__value--pre">${escapeHtml(timestampLabel)}</td>
                             </tr>
                             <tr>
-                                <td style="width:30%;padding:0.75rem;font-weight:600;color:#5d92ff;vertical-align:top;word-break:break-word;overflow-wrap:break-word;background-color:#f8fafc;">Investigative Steps</td>
-                                <td style="width:70%;padding:0.75rem;color:#1f2937;vertical-align:top;word-break:break-word;overflow-wrap:break-word;font-family:'Times New Roman',Times,serif;white-space:pre-wrap;">${escapeHtml(investigationStepsDisplay)}</td>
+                                <td class="history-entry-card__label">Error</td>
+                                <td class="history-entry-card__value history-entry-card__value--pre">${escapeHtml(errorDisplay)}</td>
+                            </tr>
+                            <tr>
+                                <td class="history-entry-card__label">Log File Name</td>
+                                <td class="history-entry-card__value history-entry-card__value--pre">${escapeHtml(logFileName)}</td>
+                            </tr>
+                            <tr>
+                                <td class="history-entry-card__label">Suspected Functions</td>
+                                <td class="history-entry-card__value history-entry-card__value--pre">${escapeHtml(suspectedFunctionsDisplay)}</td>
+                            </tr>
+                            <tr>
+                                <td class="history-entry-card__label">Suspected Configs</td>
+                                <td class="history-entry-card__value history-entry-card__value--pre">${escapeHtml(suspectedConfigsDisplay)}</td>
+                            </tr>
+                            <tr>
+                                <td class="history-entry-card__label">Investigative Steps</td>
+                                <td class="history-entry-card__value history-entry-card__value--pre">${escapeHtml(investigationStepsDisplay)}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -7229,34 +8495,34 @@ document.addEventListener('DOMContentLoaded', function() {
             : 'No errors';
         
         return `
-            <div class="history-entry-card"style="background-color:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:0;margin-bottom:1.25rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);overflow:hidden;max-width:100%;width:100%;box-sizing:border-box;">
-                <div style="background-color:#f8fafc;padding:0.75rem;border-bottom:2px solid #e2e8f0;max-width:100%;box-sizing:border-box;">
-                    <div style="text-align:center;max-width:100%;">
-                        <div style="color:#5d92ff;font-size:1.1rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;word-break:break-word;overflow-wrap:break-word;">${escapeHtml(activityLabel)}</div>
+            <div class="history-entry-card history-entry-card--compact" style="background-color:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:0;margin-bottom:1.25rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);overflow:hidden;max-width:100%;width:100%;box-sizing:border-box;">
+                <div class="history-entry-card__head">
+                    <div class="history-entry-card__head-inner">
+                        <div class="history-entry-card__title">${escapeHtml(activityLabel)}</div>
                     </div>
                 </div>
-                <div style="padding:1rem;max-width:100%;box-sizing:border-box;overflow-x:auto;">
-                    <table style="width:100%;border-collapse:collapse;table-layout:fixed;word-wrap:break-word;word-break:break-word;max-width:100%;box-sizing:border-box;">
+                <div class="history-entry-card__body">
+                    <table class="history-entry-card__table">
                         <tbody>
-                            <tr style="border-bottom:1px solid #e2e8f0;">
-                                <td style="width:30%;padding:0.75rem;font-weight:600;color:#5d92ff;vertical-align:top;word-break:break-word;overflow-wrap:break-word;background-color:#f8fafc;">Time of Creation</td>
-                                <td style="width:70%;padding:0.75rem;color:#1f2937;vertical-align:top;word-break:break-word;overflow-wrap:break-word;font-family:'Times New Roman',Times,serif;white-space:pre-wrap;">${escapeHtml(timestampLabel)}</td>
+                            <tr>
+                                <td class="history-entry-card__label">Time of Creation</td>
+                                <td class="history-entry-card__value history-entry-card__value--pre">${escapeHtml(timestampLabel)}</td>
                             </tr>
-                            <tr style="border-bottom:1px solid #e2e8f0;">
-                                <td style="width:30%;padding:0.75rem;font-weight:600;color:#5d92ff;vertical-align:top;word-break:break-word;overflow-wrap:break-word;background-color:#f8fafc;">Commit Message</td>
-                                <td style="width:70%;padding:0.75rem;color:#1f2937;vertical-align:top;word-break:break-word;overflow-wrap:break-word;font-family:'Times New Roman',Times,serif;">
+                            <tr>
+                                <td class="history-entry-card__label">Commit Message</td>
+                                <td class="history-entry-card__value">
                                     <div style="max-height:300px;overflow-y:auto;overflow-x:hidden;white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;max-width:100%;box-sizing:border-box;">${escapeHtml(commitMessage)}</div>
                                 </td>
                             </tr>
-                            <tr style="border-bottom:1px solid #e2e8f0;">
-                                <td style="width:30%;padding:0.75rem;font-weight:600;color:#5d92ff;vertical-align:top;word-break:break-word;overflow-wrap:break-word;background-color:#f8fafc;">Commit Error</td>
-                                <td style="width:70%;padding:0.75rem;color:#1f2937;vertical-align:top;word-break:break-word;overflow-wrap:break-word;font-family:'Times New Roman',Times,serif;">
+                            <tr>
+                                <td class="history-entry-card__label">Commit Error</td>
+                                <td class="history-entry-card__value">
                                     <div style="max-height:200px;overflow-y:auto;overflow-x:hidden;white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;max-width:100%;box-sizing:border-box;">${escapeHtml(commitErrorDisplay)}</div>
                                 </td>
                             </tr>
                             <tr>
-                                <td style="width:30%;padding:0.75rem;font-weight:600;color:#5d92ff;vertical-align:top;word-break:break-word;overflow-wrap:break-word;background-color:#f8fafc;">Commit Details</td>
-                                <td style="width:70%;padding:0.75rem;color:#1f2937;vertical-align:top;word-break:break-word;overflow-wrap:break-word;font-family:'Times New Roman',Times,serif;">
+                                <td class="history-entry-card__label">Commit Details</td>
+                                <td class="history-entry-card__value">
                                     <div style="max-height:400px;overflow-y:auto;overflow-x:hidden;white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;max-width:100%;box-sizing:border-box;">${escapeHtml(commitDetails)}</div>
                                 </td>
                             </tr>
@@ -7269,18 +8535,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function buildGenericMarkup(entry, activityLabel, timestampLabel, title, output) {
         return `
-            <div class="history-entry-card"style="background-color:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:0;margin-bottom:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);overflow:hidden;max-width:100%;width:100%;box-sizing:border-box;">
-                <div style="background-color:#f8fafc;padding:0.75rem;border-bottom:2px solid #e2e8f0;max-width:100%;box-sizing:border-box;">
-                    <div style="text-align:center;max-width:100%;">
-                        <div style="color:#5d92ff;font-size:1.1rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;word-break:break-word;overflow-wrap:break-word;">${escapeHtml(activityLabel)}</div>
-                        ${title ? `<div style="color:#1f2937;font-size:0.95rem;font-weight:500;word-break:break-word;overflow-wrap:break-word;">${escapeHtml(title)}</div>`: ''}
-                        <div style="color:#64748b;font-size:0.85rem;margin-top:0.4rem;word-break:break-word;overflow-wrap:break-word;">${escapeHtml(timestampLabel)}</div>
+            <div class="history-entry-card history-entry-card--compact" style="background-color:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:0;margin-bottom:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);overflow:hidden;max-width:100%;width:100%;box-sizing:border-box;">
+                <div class="history-entry-card__head">
+                    <div class="history-entry-card__head-inner">
+                        <div class="history-entry-card__title">${escapeHtml(activityLabel)}</div>
+                        ${title ? `<div class="history-entry-card__subtitle">${escapeHtml(title)}</div>`: ''}
+                        <div class="history-entry-card__meta">${escapeHtml(timestampLabel)}</div>
                     </div>
                 </div>
                 ${output ? `
-                <div style="padding:1rem;max-width:100%;box-sizing:border-box;">
-                    <div style="text-align:center;color:#5d92ff;font-size:0.95rem;font-weight:600;margin-bottom:0.35rem;padding-bottom:0.25rem;border-bottom:1px solid #e2e8f0;word-break:break-word;overflow-wrap:break-word;">Output</div>
-                    <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:0.75rem;font-family:monospace;font-size:0.85rem;white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;max-height:300px;overflow-y:auto;overflow-x:hidden;color:#374151;text-align:left;max-width:100%;box-sizing:border-box;">
+                <div style="padding:0;max-width:100%;box-sizing:border-box;">
+                    <div class="history-entry-card__output-label">Output</div>
+                    <div class="history-entry-card__output-body">
 ${escapeHtml(output)}
                     </div>
                 </div>
@@ -7299,15 +8565,196 @@ ${escapeHtml(output)}
         }, 2000);
     }
 
-    async function loadUserHistory(options = {}) {
-        
-        // Re-query the element to ensure it exists
-        const historyResultsAreaEl = document.getElementById('historyResultsArea');
-        if (!historyResultsAreaEl) {
-            console.error('[UserHistory] historyResultsArea element not found!');
+    function formatTimelineTime(timestamp) {
+        if (!timestamp) return '—';
+        try {
+            const date = new Date(timestamp);
+            if (Number.isNaN(date.getTime())) return '—';
+            return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        } catch {
+            return '—';
+        }
+    }
+
+    function formatSessionDate(timestamp) {
+        if (!timestamp) return '—';
+        try {
+            const date = new Date(timestamp);
+            if (Number.isNaN(date.getTime())) return '—';
+            return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+        } catch {
+            return '—';
+        }
+    }
+
+    function getTimelineDotClass(entry) {
+        const type = (entry.activity_type || '').toLowerCase();
+        if (type === 'bug-analysis') return 'activity-timeline-dot--red';
+        if (['test-script', 'test-case', 'code-assistant', 'git-commit'].includes(type)) {
+            return 'activity-timeline-dot--green';
+        }
+        return 'activity-timeline-dot--blue';
+    }
+
+    function getTimelineEventTitle(entry) {
+        return entry.activity_label || entry.title || entry.activity_type || 'Activity';
+    }
+
+    function getTimelineEventDetails(entry) {
+        const record = entry.record || {};
+        const parts = [];
+        if (entry.title && entry.title !== getTimelineEventTitle(entry)) {
+            parts.push(entry.title);
+        }
+        const preview = entry.output_preview
+            || record.response
+            || record.output
+            || record.generated_script
+            || record.generated_test_case
+            || record.commit_message
+            || '';
+        if (preview) {
+            const line = String(preview).replace(/\s+/g, ' ').trim();
+            parts.push(line.length > 100 ? `${line.slice(0, 100)}…` : line);
+        }
+        if (record.file_path) {
+            parts.push(record.file_path);
+        }
+        if (!parts.length && entry.activity_type) {
+            parts.push(entry.activity_type.replace(/-/g, ' '));
+        }
+        return parts.join(' · ') || 'No additional details';
+    }
+
+    function buildTimelineRowHtml(entry, index) {
+        const time = formatTimelineTime(entry.timestamp);
+        const title = escapeHtml(getTimelineEventTitle(entry));
+        const details = escapeHtml(getTimelineEventDetails(entry));
+        const dotClass = getTimelineDotClass(entry);
+        return `
+            <button type="button" class="activity-timeline-row" data-index="${index}" aria-label="${title}" aria-selected="false">
+                <span class="activity-timeline-dot ${dotClass}" aria-hidden="true"></span>
+                <span class="activity-timeline-time">${escapeHtml(time)}</span>
+                <span class="activity-timeline-body">
+                    <strong class="activity-timeline-title">${title}</strong>
+                    <span class="activity-timeline-details"> · ${details}</span>
+                </span>
+            </button>
+        `;
+    }
+
+    function clearHistoryDetailPanel() {
+        const detailArea = document.getElementById('historyDetailArea');
+        const detailEmpty = document.getElementById('historyDetailEmpty');
+        if (detailArea) {
+            detailArea.innerHTML = '';
+            detailArea.hidden = true;
+        }
+        if (detailEmpty) detailEmpty.hidden = false;
+        document.querySelectorAll('.activity-timeline-row.is-active').forEach(row => {
+            row.classList.remove('is-active');
+            row.setAttribute('aria-selected', 'false');
+        });
+    }
+
+    function selectTimelineEntry(index) {
+        const entry = userHistoryDisplayedEntries[index];
+        if (!entry) return;
+
+        document.querySelectorAll('.activity-timeline-row').forEach(row => {
+            const isActive = parseInt(row.getAttribute('data-index'), 10) === index;
+            row.classList.toggle('is-active', isActive);
+            row.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
+
+        const detailArea = document.getElementById('historyDetailArea');
+        const detailEmpty = document.getElementById('historyDetailEmpty');
+        if (!detailArea) return;
+
+        detailArea.innerHTML = buildHistoryEntryMarkup(entry);
+        detailArea.hidden = false;
+        if (detailEmpty) detailEmpty.hidden = true;
+    }
+
+    function renderActivityLogTimeline(entries, totalCount) {
+        const timelineList = document.getElementById('activityTimelineList');
+        const timelineDate = document.getElementById('activityTimelineDate');
+        const timelineTitle = document.getElementById('activityTimelineTitle');
+        const subtitle = document.getElementById('activityLogSubtitle');
+
+        if (!timelineList) {
+            console.error('[UserHistory] activityTimelineList element not found!');
             return;
         }
-        console.log('[UserHistory] historyResultsArea element found');
+
+        userHistoryDisplayedEntries = entries;
+
+        const total = totalCount != null ? totalCount : entries.length;
+        if (subtitle) {
+            const shown = entries.length;
+            subtitle.textContent = total > shown
+                ? `Showing ${shown} of ${total} events`
+                : `All platform events · ${shown} event${shown === 1 ? '' : 's'}`;
+        }
+
+        if (!entries.length) {
+            timelineList.innerHTML = '<p class="activity-log-empty">No history entries found for the selected filters.</p>';
+            if (timelineDate) timelineDate.textContent = '—';
+            if (timelineTitle) timelineTitle.textContent = 'Event Timeline';
+            clearHistoryDetailPanel();
+            return;
+        }
+
+        if (timelineDate) {
+            timelineDate.textContent = formatSessionDate(entries[0].timestamp);
+        }
+        if (timelineTitle) {
+            timelineTitle.textContent = 'Event Timeline — Recent Session';
+        }
+
+        timelineList.innerHTML = entries.map((entry, index) => buildTimelineRowHtml(entry, index)).join('');
+
+        timelineList.querySelectorAll('.activity-timeline-row').forEach(row => {
+            row.addEventListener('click', function() {
+                const idx = parseInt(this.getAttribute('data-index'), 10);
+                selectTimelineEntry(idx);
+            });
+        });
+
+        clearHistoryDetailPanel();
+    }
+
+    function exportUserHistoryCsv() {
+        if (!userHistoryDisplayedEntries.length) {
+            showStatusBar('No history entries to export', 'warning');
+            return;
+        }
+        const headers = ['Time', 'Activity', 'Title', 'Details'];
+        const rows = userHistoryDisplayedEntries.map(entry => [
+            formatHistoryTimestamp(entry.timestamp),
+            getTimelineEventTitle(entry),
+            entry.title || '',
+            getTimelineEventDetails(entry),
+        ]);
+        const csv = [headers, ...rows]
+            .map(cols => cols.map(col => `"${String(col).replace(/"/g, '""')}"`).join(','))
+            .join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `activity-log-${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+        showStatusBar('Activity log exported', 'success');
+    }
+
+    async function loadUserHistory(options = {}) {
+        const timelineList = document.getElementById('activityTimelineList');
+        if (!timelineList) {
+            console.error('[UserHistory] activityTimelineList element not found!');
+            return;
+        }
         const { forceRefresh = false, silent = false } = options;
         if (userHistoryLoading && !forceRefresh) {
             console.log('[UserHistory] Already loading, skipping');
@@ -7358,15 +8805,14 @@ ${escapeHtml(output)}
         }
 
         userHistoryLoading = true;
-        // Always show loading indicator while processing
         console.log('[UserHistory] Showing loading indicator');
-        historyResultsAreaEl.innerHTML = `
-            <div style="text-align:center;margin-top:2rem;padding:2rem;">
-                <div style="display:inline-block;width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#5d92ff;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:1rem;"></div>
-                <p style="color:#5d92ff;font-size:1rem;font-weight:500;">Processing user history…</p>
-                <p style="color:#9ca3af;font-size:0.85rem;margin-top:0.5rem;">Loading records from history files</p>
+        timelineList.innerHTML = `
+            <div style="text-align:center;padding:2rem 1rem;">
+                <div style="display:inline-block;width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:0.75rem;"></div>
+                <p style="color:#64748b;font-size:0.875rem;margin:0;">Loading activity history…</p>
             </div>
         `;
+        clearHistoryDetailPanel();
 
         const requestPayload = {
             time_period: TIME_PERIOD_REQUEST_MAP[userHistoryFilters.timePeriod] || 'all',
@@ -7391,34 +8837,22 @@ ${escapeHtml(output)}
 
             const entries = Array.isArray(response.entries) ? response.entries : [];
             
-            if (!entries.length) {
-                historyResultsAreaEl.innerHTML = `
-                    <div style="text-align:center;margin-top:2rem;padding:2rem;">
-                        <p style="color:#9ca3af;font-size:1rem;font-style:italic;">No history entries found for the selected filters.</p>
-                        <p style="color:#6b7280;font-size:0.85rem;margin-top:0.5rem;">Try selecting different time period or activity type.</p>
-                    </div>
-                `;
-                userHistoryLoading = false;
-                return;
-            }
-
-            // Sort entries by timestamp (newest first) if not already sorted
             const sortedEntries = [...entries].sort((a, b) => {
                 const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
                 const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
                 return timeB - timeA;
             });
 
-            const historyHtml = sortedEntries.map(buildHistoryEntryMarkup).join('');
-            historyResultsAreaEl.innerHTML = historyHtml;
+            const displayEntries = sortedEntries.slice(0, USER_HISTORY_TIMELINE_LIMIT);
+            renderActivityLogTimeline(displayEntries, sortedEntries.length);
         } catch (error) {
             console.error('[UserHistory] Failed to load user history:', error);
-            historyResultsAreaEl.innerHTML = `
-                <div style="text-align:center;margin-top:2rem;padding:2rem;">
-                    <p style="color:#f87171;font-size:1rem;font-weight:500;">Failed to load history</p>
-                    <p style="color:#9ca3af;font-size:0.85rem;margin-top:0.5rem;">${escapeHtml(error.message || 'Unknown error')}</p>
-                </div>
+            timelineList.innerHTML = `
+                <p class="activity-log-empty" style="color:#ef4444;font-style:normal;">
+                    Failed to load history: ${escapeHtml(error.message || 'Unknown error')}
+                </p>
             `;
+            clearHistoryDetailPanel();
         } finally {
             userHistoryLoading = false;
         }
@@ -8505,6 +9939,79 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
             statusDiv.style.color = '#6b7280';
         }
     }
+
+    /** Stage total_content.txt into the hidden file input (Specification Intelligence → Test Script Generator). */
+    async function stageTotalContentFileForTestScriptGenerator(filePath) {
+        const fileInput = document.getElementById('testDatasetFiles');
+        if (!fileInput) {
+            showStatusBar('Dataset upload control not found', 'error');
+            return false;
+        }
+
+        const readFn = window.API?.readFileForUpload;
+        if (typeof readFn !== 'function') {
+            showStatusBar('Cannot read dataset file from disk in this environment', 'error');
+            return false;
+        }
+
+        let readResult;
+        try {
+            readResult = await readFn(filePath, workingDirectory);
+        } catch (err) {
+            console.error('readFileForUpload failed:', err);
+            showStatusBar(`Could not read total_content.txt: ${err.message}`, 'error');
+            return false;
+        }
+
+        if (!readResult?.success) {
+            showStatusBar(`Could not read total_content.txt: ${readResult?.error || 'unknown error'}`, 'error');
+            return false;
+        }
+
+        const fileName = readResult.name || 'total_content.txt';
+        const blob = new Blob([readResult.content], { type: 'text/plain' });
+        const file = new File([blob], fileName, { type: 'text/plain', lastModified: Date.now() });
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+
+        currentTestDataset = null;
+        displaySelectedFiles(fileInput.files);
+
+        const loadBtn = document.getElementById('loadTestDatasetBtn');
+        if (loadBtn) {
+            loadBtn.disabled = false;
+            loadBtn.textContent = 'Load';
+            loadBtn.style.backgroundColor = '';
+        }
+
+        const statusDiv = document.getElementById('testDatasetStatus');
+        if (statusDiv) {
+            statusDiv.textContent = `${fileName} ready — click Load to import`;
+            statusDiv.style.color = '#5d92ff';
+        }
+
+        return true;
+    }
+
+    window.sendDatasetToTestScriptGenerator = async function sendDatasetToTestScriptGenerator() {
+        const filePath = buildTotalContentFilePathFromSelection();
+
+        if (!filePath) {
+            showStatusBar('Complete dataset extraction first, then send to Test Script Generator', 'warning');
+            return;
+        }
+
+        const staged = await stageTotalContentFileForTestScriptGenerator(filePath);
+        if (!staged) return;
+
+        if (typeof window.navigateToAppSection === 'function') {
+            window.navigateToAppSection('test-script-generator');
+        }
+
+        showStatusBar('total_content.txt selected — click Load in Dataset Upload to import', 'success');
+        updateTsgStatusBar();
+    };
     function getFileIcon(filename) {
         const extension = filename.split('.').pop().toLowerCase();
         switch (extension) {
@@ -12317,6 +13824,129 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
         layer4: 'Layer 4: Variable Impact Analysis'
     };
 
+    const CE_REVIEW_CRITERIA_META = {
+        layer1: {
+            tone: 'blue',
+            title: 'Syntax & Structural Validation',
+            description: 'Edge cases, guard conditions, type safety',
+            icon: 'info',
+        },
+        layer2: {
+            tone: 'green',
+            title: '3GPP Spec Reference Analysis',
+            description: 'Cross-reference against TS 38.214 / 38.322 / 38.212',
+            icon: 'check',
+        },
+        layer3: {
+            tone: 'blue',
+            title: 'LLM as Judge',
+            description: 'Automated quality and correctness assessment',
+            icon: 'info',
+        },
+        layer4: {
+            tone: 'amber',
+            title: 'Variable Impact Analysis',
+            description: 'Side effects, scheduler timing, dependency impact',
+            icon: 'warn',
+        },
+    };
+
+    function getCeCriteriaIconSvg(iconType) {
+        if (iconType === 'check') {
+            return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+        }
+        if (iconType === 'warn') {
+            return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>';
+        }
+        return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
+    }
+
+    function updateCeReviewCriteria() {
+        const listEl = document.getElementById('ceReviewCriteriaList');
+        if (!listEl) return;
+
+        const selected = [];
+        document.querySelectorAll('.ce-layer-checkbox').forEach((cb) => {
+            if (cb.checked && cb.dataset.layer) {
+                selected.push(cb.dataset.layer);
+            }
+        });
+
+        if (!selected.length) {
+            listEl.innerHTML = '<p class="ce-criteria-empty">Select test options on the left to see review criteria.</p>';
+            return;
+        }
+
+        listEl.innerHTML = selected.map((layerKey) => {
+            const meta = CE_REVIEW_CRITERIA_META[layerKey] || {
+                tone: 'blue',
+                title: layerKey,
+                description: '',
+                icon: 'info',
+            };
+            return `
+                <div class="ce-criteria-card ce-criteria-card--${meta.tone}">
+                    <span class="ce-criteria-card__icon" aria-hidden="true">${getCeCriteriaIconSvg(meta.icon)}</span>
+                    <div class="ce-criteria-card__text">
+                        <div class="ce-criteria-card__title">${escapeHtml(meta.title)}</div>
+                        <div class="ce-criteria-card__desc">${escapeHtml(meta.description)}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function initCeReviewCriteriaSync() {
+        document.querySelectorAll('.ce-layer-checkbox').forEach((cb) => {
+            cb.addEventListener('change', updateCeReviewCriteria);
+        });
+        updateCeReviewCriteria();
+    }
+
+    function initCeReviewTypeDropdown() {
+        const dropdown = document.getElementById('ceReviewTypeDropdown');
+        const btn = document.getElementById('ceReviewTypeBtn');
+        const menu = document.getElementById('ceReviewTypeDropdownMenu');
+        const label = document.getElementById('ceReviewTypeBtnLabel');
+        const hidden = document.getElementById('ceReviewTypeFilter');
+        if (!dropdown || !btn || !menu) return;
+
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropdown.classList.toggle('active');
+        });
+
+        menu.querySelectorAll('.dropdown-item').forEach((item) => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const value = this.getAttribute('data-value') || 'git-diff';
+                const text = this.textContent.trim();
+                if (hidden) hidden.value = value;
+                if (label) label.textContent = text;
+                dropdown.classList.remove('active');
+            });
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!dropdown.contains(e.target)) {
+                dropdown.classList.remove('active');
+            }
+        });
+    }
+
+    function initCeSubmitReviewUi() {
+        initCeReviewCriteriaSync();
+        initCeReviewTypeDropdown();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initCeSubmitReviewUi);
+    } else {
+        initCeSubmitReviewUi();
+    }
+
     function updateCeResultsDetailSubtitle(layerValue) {
         const subtitleEl = document.getElementById('ceResultsDetailSubtitle');
         if (!subtitleEl) return;
@@ -13168,6 +14798,18 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
             }
         });
 
+        function updateRoleDropdownUi(role) {
+            const hasRole = Boolean(role);
+            roleDropdown.classList.toggle('has-selection', hasRole);
+            roleBtn.classList.toggle('is-selected', hasRole);
+            const menu = roleDropdown.querySelector('.dropdown-content');
+            if (menu) {
+                menu.querySelectorAll('.dropdown-item[data-role]').forEach(item => {
+                    item.classList.toggle('is-selected', item.getAttribute('data-role') === role);
+                });
+            }
+        }
+
         // Role selection with dynamic template category display
         const dropdownContent = roleDropdown.querySelector('.dropdown-content');
         if (dropdownContent) {
@@ -13177,30 +14819,23 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
                 e.stopPropagation();
                 
                 const role = this.getAttribute('data-role');
-                const roleText = this.textContent;
+                const roleText = this.textContent.trim();
                     
                     console.log('📋 Role selected:', role, roleText);
                 
                 // Update dropdown button text
-                const buttonSpan = roleBtn.querySelector('span');
+                const buttonSpan = roleBtn.querySelector('.prompt-studio-role-btn-text');
                 if (buttonSpan) {
                     buttonSpan.textContent = roleText;
                 }
+                updateRoleDropdownUi(role);
                 // Close dropdown
                 roleDropdown.classList.remove('active');
                     
                     // Display template categories for selected role
                     showTemplateCategoriesForRole(role);
                     
-                    // Clear template content area
-                    const promptTextArea = document.getElementById('templateTextArea');
-                    if (promptTextArea) {
-                        promptTextArea.innerHTML = '<p style="color: #666; text-align: center; margin-top: 2rem;">Select a template category to view content</p>';
-                    }
-                    
-                    // Hide modify and save buttons
-                    if (promptModifyBtn) promptModifyBtn.style.display = 'none';
-                    if (promptSaveBtn) promptSaveBtn.style.display = 'none';
+                    clearPromptDetailPanel();
                     currentPromptTemplateKey = null;
             });
         });
@@ -13217,10 +14852,10 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
     // Role templates mapping (from PyQt UI_v3.py)
     const roleTemplates = {
         "tester": [
-            { name: "Test Script", description: "Create automated test scripts", icon: ""},
-            { name: "Test Case", description: "Generate comprehensive test cases", icon: ""},
+            { name: "Test Script", description: "Generate comprehensive test scripts", icon: ""},
+            { name: "Test Case", description: "Generate test cases and coverage", icon: ""},
             { name: "Bug Analysis", description: "Analyze and fix issues", icon: ""},
-            { name: "Performance Test", description: "Design performance test cases", icon: ""}
+            { name: "Performance Test", description: "Design performance tests", icon: ""}
         ],
         "developer": [
             { name: "Code Assistant", description: "Generate high-quality code", icon: ""},
@@ -13228,7 +14863,7 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
         ],
         "analyst": [
             { name: "Feature Design", description: "Analyze feature requirements", icon: ""},
-            { name: "Code Assistant", description: "Review code quality", icon: ""},
+            { name: "Code Assistant", description: "Review and optimize code", icon: ""},
             { name: "Bug Analysis", description: "Analyze issue patterns", icon: ""}
         ]
     };
@@ -13299,7 +14934,255 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
 
     // Store current role for template operations
     let currentSelectedRole = null;
-    
+    let currentActiveCategoryCard = null;
+
+    function getTemplateTag(templateName, role) {
+        const slug = (templateName || '').toLowerCase().replace(/\s+/g, '-').slice(0, 16);
+        if (slug) return slug;
+        return role || 'template';
+    }
+
+    function getTemplateSnippet(content) {
+        if (!content) return 'No preview available';
+        const text = typeof content === 'string'
+            ? content
+            : [content['System Prompt'], content['User Prompt']].filter(Boolean).join(' ');
+        const oneLine = text.replace(/\s+/g, ' ').trim();
+        if (!oneLine) return 'No preview available';
+        const preview = oneLine.length > 72 ? `${oneLine.slice(0, 72)}…` : oneLine;
+        return `"${preview}"`;
+    }
+
+    function parseTemplateForDisplay(raw) {
+        if (!raw) return { system: '', user: '' };
+        if (typeof raw === 'string') {
+            const parts = raw.split(/\n\n+/);
+            if (parts.length > 1) {
+                return { system: parts[0], user: parts.slice(1).join('\n\n') };
+            }
+            return { system: raw, user: '' };
+        }
+        if (typeof raw === 'object') {
+            return {
+                system: raw['System Prompt'] || '',
+                user: raw['User Prompt'] || ''
+            };
+        }
+        return { system: String(raw), user: '' };
+    }
+
+    function updatePromptLibraryCount(count, roleLabel) {
+        const titleEl = document.getElementById('promptPromptsPanelTitle');
+        const badgeEl = document.getElementById('promptPromptsCount');
+        const panel = document.getElementById('promptPromptsPanel');
+        if (count == null) {
+            if (titleEl) titleEl.textContent = 'Prompts';
+            if (badgeEl) badgeEl.textContent = '0 items';
+            if (panel) panel.classList.remove('has-items');
+            return;
+        }
+        if (titleEl) {
+            titleEl.textContent = roleLabel ? `${roleLabel} Prompts` : 'Prompts';
+        }
+        if (badgeEl) {
+            badgeEl.textContent = `${count} item${count === 1 ? '' : 's'}`;
+        }
+        if (panel) panel.classList.add('has-items');
+    }
+
+    function getCategoryIconKey(name) {
+        const key = (name || '').toLowerCase().replace(/\s+/g, '-');
+        const map = {
+            'test-script': 'test-script',
+            'test-case': 'test-case',
+            'test-data': 'test-data',
+            'test-scenarios': 'test-scenarios',
+            'expected-results': 'expected-results',
+            'test-summary': 'test-summary',
+            'bug-analysis': 'bug-analysis',
+            'performance-test': 'performance-test',
+            'code-assistant': 'code-assistant',
+            'feature-design': 'feature-design',
+            'add-template': 'add-template'
+        };
+        return map[key] || 'default';
+    }
+
+    function getCategoryIconSvg(iconKey) {
+        const sw = '1.75';
+        const icons = {
+            'test-script': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 9l-2 3 2 3"/><path d="M15 9l2 3-2 3"/></svg>`,
+            'test-case': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h4"/></svg>`,
+            'test-data': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`,
+            'test-scenarios': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h5a4 4 0 0 1 4 4v2"/><path d="M16 18H11a4 4 0 0 1-4-4v-2"/></svg>`,
+            'expected-results': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 12l2 2 4-4"/></svg>`,
+            'test-summary': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>`,
+            'bug-analysis': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2"/><path d="M5 9H3a2 2 0 0 0-2 2v1h20v-1a2 2 0 0 0-2-2h-2"/><path d="M7 14v5"/><path d="M17 14v5"/><path d="M9 22h6"/><path d="M8 8h8"/></svg>`,
+            'performance-test': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M7 20h10"/><path d="M9 16v4"/><path d="M15 16v4"/><path d="M8 12l3-4 2 2 3-4"/></svg>`,
+            'code-assistant': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 9l-2 3 2 3"/><path d="M15 9l2 3-2 3"/></svg>`,
+            'feature-design': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.2 3.6L17 8l-3.6 1.2L12 13l-1.2-3.6L7 8l3.6-1.2z"/><path d="M5 19h14"/><path d="M8 22h8"/></svg>`,
+            'add-template': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>`,
+            'default': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>`
+        };
+        return icons[iconKey] || icons.default;
+    }
+
+    function buildCategoryCardHtml(name, subtext, isUserTemplate, options = {}) {
+        const { isAdd = false } = options;
+        const escapedName = escapeHtml(name);
+        const escapedSub = escapeHtml(subtext);
+        const addClass = isAdd ? ' prompt-studio-category-card--add add-template-card' : '';
+        const iconKey = isAdd ? 'add-template' : getCategoryIconKey(name);
+        const iconSvg = getCategoryIconSvg(iconKey);
+        return `
+            <button type="button" class="prompt-studio-category-card template-category-card${addClass}"
+                    data-template-name="${escapedName}"
+                    data-is-user-template="${isUserTemplate ? 'true' : 'false'}">
+                <span class="prompt-studio-category-card-icon prompt-studio-category-card-icon--${iconKey}" aria-hidden="true">${iconSvg}</span>
+                <span class="prompt-studio-category-card-body">
+                    <span class="prompt-studio-category-card-title">${escapedName}</span>
+                    <span class="prompt-studio-category-card-sub">${escapedSub}</span>
+                </span>
+                <span class="prompt-studio-category-card-chevron" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                </span>
+            </button>
+        `;
+    }
+
+    function showPromptDetailEmpty() {
+        const empty = document.getElementById('promptDetailEmpty');
+        const panel = document.getElementById('promptDetailPanel');
+        if (empty) {
+            empty.hidden = false;
+            empty.innerHTML = '<p>Select a template category to view content</p>';
+        }
+        if (panel) panel.hidden = true;
+    }
+
+    function clearPromptDetailPanel() {
+        showPromptDetailEmpty();
+        const systemEl = document.getElementById('promptSystemPrompt');
+        const userEl = document.getElementById('promptUserPrompt');
+        if (systemEl) systemEl.value = '';
+        if (userEl) userEl.value = '';
+        setPromptDetailReadonly(true);
+        const saveBtn = document.getElementById('promptSaveBtn');
+        const deleteBtn = document.getElementById('promptDeleteBtn');
+        if (saveBtn) saveBtn.style.display = 'none';
+        if (deleteBtn) deleteBtn.style.display = 'none';
+        if (currentActiveCategoryCard) {
+            currentActiveCategoryCard.classList.remove('is-active');
+            currentActiveCategoryCard = null;
+        }
+    }
+
+    function setPromptDetailReadonly(readonly) {
+        const systemEl = document.getElementById('promptSystemPrompt');
+        const userEl = document.getElementById('promptUserPrompt');
+        const modelBtn = document.getElementById('promptModelBtn');
+        const modelDropdown = document.getElementById('promptModelDropdown');
+        [systemEl, userEl].forEach(el => {
+            if (!el) return;
+            if (readonly) {
+                el.setAttribute('readonly', 'readonly');
+            } else {
+                el.removeAttribute('readonly');
+            }
+        });
+        if (modelBtn) modelBtn.disabled = readonly;
+        if (modelDropdown && readonly) modelDropdown.classList.remove('active');
+    }
+
+    function initPromptModelDropdown() {
+        const dropdown = document.getElementById('promptModelDropdown');
+        const btn = document.getElementById('promptModelBtn');
+        const menu = document.getElementById('promptModelDropdownMenu');
+        const label = document.getElementById('promptModelBtnLabel');
+        const hidden = document.getElementById('promptModelSelect');
+        if (!dropdown || !btn || !menu) return;
+
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (btn.disabled) return;
+            dropdown.classList.toggle('active');
+        });
+
+        menu.querySelectorAll('.dropdown-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const value = this.getAttribute('data-value') || '';
+                const text = this.textContent.trim();
+                if (hidden) hidden.value = value;
+                if (label) label.textContent = text;
+                dropdown.classList.remove('active');
+            });
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!dropdown.contains(e.target)) {
+                dropdown.classList.remove('active');
+            }
+        });
+    }
+
+    initPromptModelDropdown();
+
+    function setActiveCategoryCard(card) {
+        const list = document.getElementById('templateCategoriesArea');
+        if (list) {
+            list.querySelectorAll('.prompt-studio-category-card').forEach(btn => {
+                btn.classList.remove('is-active');
+                btn.removeAttribute('aria-selected');
+            });
+        } else if (currentActiveCategoryCard) {
+            currentActiveCategoryCard.classList.remove('is-active');
+            currentActiveCategoryCard.removeAttribute('aria-selected');
+        }
+        currentActiveCategoryCard = card || null;
+        if (card) {
+            card.classList.add('is-active');
+            card.setAttribute('aria-selected', 'true');
+        }
+    }
+
+    function restoreActiveCategoryCardHighlight() {
+        if (!currentPromptTemplateKey) return;
+        const list = document.getElementById('templateCategoriesArea');
+        if (!list) return;
+        list.querySelectorAll('.template-category-card:not(.add-template-card)').forEach(card => {
+            if (card.getAttribute('data-template-name') === currentPromptTemplateKey) {
+                setActiveCategoryCard(card);
+            }
+        });
+    }
+
+    function getCategorySubtext(templateName, fallbackDescription, isUserTemplate, userPrompt) {
+        if (isUserTemplate) {
+            if (userPrompt) {
+                const line = userPrompt.replace(/\s+/g, ' ').trim();
+                return line.length > 52 ? `${line.slice(0, 52)}…` : line;
+            }
+            return 'Custom template';
+        }
+        if (fallbackDescription) {
+            return fallbackDescription;
+        }
+        const cached = testPromptTemplates && testPromptTemplates[templateName];
+        if (cached) {
+            const text = typeof cached === 'string'
+                ? cached
+                : [cached['System Prompt'], cached['User Prompt']].filter(Boolean).join(' ');
+            const line = text.replace(/\s+/g, ' ').trim();
+            if (line) {
+                return line.length > 52 ? `${line.slice(0, 52)}…` : line;
+            }
+        }
+        return '';
+    }
+
     // Function to display template categories for selected role
     function showTemplateCategoriesForRole(role) {
         currentSelectedRole = role;
@@ -13308,199 +15191,182 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
             console.error('❌ templateCategoriesArea not found');
             return;
         }
-        
+
+        clearPromptDetailPanel();
+
         const templates = roleTemplates[role] || [];
         const userTemplates = getUserTemplates(role);
+        const roleLabels = { tester: 'Tester', developer: 'Developer', analyst: 'Analyst' };
+        const roleLabel = roleLabels[role] || role;
         console.log(`📋 Displaying ${templates.length} regular templates and ${userTemplates.length} user templates for role: ${role}`);
-        
-        // Create module-style boxes like Tasks page
-        let html = '<div class="dashboard-grid"style="margin-top: 1rem;">';
-        
-        // Add regular templates
+
+        let html = '';
+
         templates.forEach(template => {
-            html += `
-                <div class="module template-category-card"data-template-name="${template.name}"
-                     data-is-user-template="false"style="cursor: pointer;">
-                    <div class="icon-bg"style="background: linear-gradient(135deg, #5d92ff, #3b82f6);">
-                        <span style="font-size: 2.5rem;">${template.icon}</span>
-                    </div>
-                    <h3>${template.name}</h3>
-                    <p>${template.description}</p>
-                </div>
-            `;
+            const subtext = getCategorySubtext(template.name, template.description, false);
+            html += buildCategoryCardHtml(template.name, subtext, false);
         });
-        
-        // Add user templates (without delete button)
+
         userTemplates.forEach(template => {
-            const escapedName = escapeHtml(template.name);
-            html += `
-                <div class="module template-category-card user-template-card"data-template-name="${escapedName}"
-                     data-is-user-template="true"style="cursor: pointer;">
-                    <div class="icon-bg"style="background: linear-gradient(135deg, #28a745, #20c997);">
-                        <span style="font-size: 2.5rem;"></span>
-                    </div>
-                    <h3>${escapedName}</h3>
-                    <p>User Template</p>
-                </div>
-            `;
+            const subtext = getCategorySubtext(template.name, 'Custom template', true, template.prompt);
+            html += buildCategoryCardHtml(template.name, subtext, true);
         });
-        
-        // Calculate total items to determine if we should center the Add Template card
-        const totalItems = templates.length + userTemplates.length;
-        const addTemplateCardClass = totalItems % 3 === 0 ? 'add-template-card add-template-centered': 'add-template-card';
-        
-        // Add "Add Template"card - same size as other cards
-        html += `
-            <div class="module template-category-card ${addTemplateCardClass}"
-                 style="cursor: pointer;">
-                <div class="icon-bg"style="background: linear-gradient(135deg, #ffc107, #ff9800);">
-                    <span style="font-size: 2.5rem;"></span>
-                </div>
-                <h3>Add Template</h3>
-                <p>Create a new template</p>
-            </div>
-        `;
-        
-        html += '</div>';
+
+        html += buildCategoryCardHtml('Add template', 'Create a new custom template', false, { isAdd: true });
+
         templateCategoriesArea.innerHTML = html;
-        
-        // Attach click event listeners to template category cards
+        updatePromptLibraryCount(templates.length + userTemplates.length, roleLabel);
+
         templateCategoriesArea.querySelectorAll('.template-category-card:not(.add-template-card)').forEach(card => {
             card.addEventListener('click', function(e) {
+                e.preventDefault();
                 const templateName = this.getAttribute('data-template-name');
                 const isUserTemplate = this.getAttribute('data-is-user-template') === 'true';
-                console.log('📝 Template category clicked:', templateName, 'isUserTemplate:', isUserTemplate);
+                setActiveCategoryCard(this);
                 loadAndDisplayPromptTemplate(templateName, isUserTemplate);
             });
         });
-        
-        // Add click listener for "Add Template"card
+
         const addTemplateCard = templateCategoriesArea.querySelector('.add-template-card');
         if (addTemplateCard) {
             addTemplateCard.addEventListener('click', function() {
                 openAddTemplateModal(role);
             });
         }
-        
+
         console.log('✅ Template categories displayed for role:', role);
     }
     
+    function renderPromptDetailPanel(templateName, rawContent, isUserTemplate) {
+        const empty = document.getElementById('promptDetailEmpty');
+        const panel = document.getElementById('promptDetailPanel');
+        const titleEl = document.getElementById('promptDetailTitle');
+        const metaEl = document.getElementById('promptDetailMeta');
+        const systemEl = document.getElementById('promptSystemPrompt');
+        const userEl = document.getElementById('promptUserPrompt');
+        const saveBtn = document.getElementById('promptSaveBtn');
+        const deleteBtn = document.getElementById('promptDeleteBtn');
+
+        const { system, user } = parseTemplateForDisplay(rawContent);
+        const tag = getTemplateTag(templateName, currentSelectedRole);
+        const roleLabels = { tester: 'Tester', developer: 'Developer', analyst: 'Analyst' };
+        const roleLabel = roleLabels[currentSelectedRole] || currentSelectedRole || 'template';
+
+        if (empty) empty.hidden = true;
+        if (panel) panel.hidden = false;
+        if (titleEl) titleEl.textContent = templateName;
+        if (metaEl) metaEl.textContent = `${tag} · ${roleLabel} · Last edited today`;
+        if (systemEl) systemEl.value = system;
+        if (userEl) userEl.value = user;
+
+        currentPromptTemplateKey = templateName;
+        currentPromptTemplateContent = user ? `${system}\n\n${user}`.trim() : system;
+        currentPromptTemplateRaw = rawContent;
+        isPromptTemplateModified = false;
+        isCurrentTemplateUserTemplate = isUserTemplate;
+
+        setPromptDetailReadonly(true);
+        if (saveBtn) saveBtn.style.display = 'none';
+        if (deleteBtn) {
+            deleteBtn.style.display = isUserTemplate ? 'inline-block' : 'none';
+        }
+    }
+
+    let currentPromptTemplateRaw = null;
+
     // Function to load and display prompt template content
     async function loadAndDisplayPromptTemplate(templateName, isUserTemplate = false) {
-    const promptTextArea = document.getElementById('templateTextArea');
-        if (!promptTextArea) {
-            console.error('❌ templateTextArea not found');
+        const panel = document.getElementById('promptDetailPanel');
+        if (!panel) {
+            console.error('❌ promptDetailPanel not found');
             return;
         }
-        
+
         console.log('📄 Loading template:', templateName, 'isUserTemplate:', isUserTemplate);
-        
-        // Show loading state
-        promptTextArea.innerHTML = '<p style="color: #666; text-align: center; margin-top: 2rem;">Loading template...</p>';
-        
+
+        const empty = document.getElementById('promptDetailEmpty');
+        if (empty) empty.hidden = true;
+        panel.hidden = true;
+
         try {
-            // Try to get template from testPromptTemplates (already loaded for Test Script Generator)
-            let templateContent = '';
-            
-            // First check if it's a user template
+            let rawContent = null;
+
             if (isUserTemplate && currentSelectedRole) {
                 const userTemplates = getUserTemplates(currentSelectedRole);
-                const userTemplate = userTemplates.find(t =>t.name === templateName);
+                const userTemplate = userTemplates.find(t => t.name === templateName);
                 if (userTemplate) {
-                    templateContent = userTemplate.prompt;
-                    console.log('✅ User template found, content length:', templateContent.length);
+                    rawContent = userTemplate.prompt;
                 }
             }
-            
-            // If not a user template or not found, check regular templates
-            if (!templateContent && testPromptTemplates && testPromptTemplates[templateName]) {
-                if (typeof testPromptTemplates[templateName] === 'string') {
-                    templateContent = testPromptTemplates[templateName];
-                } else if (typeof testPromptTemplates[templateName] === 'object') {
-                    // Handle object format with System Prompt and User Prompt
-                    const systemPrompt = testPromptTemplates[templateName]['System Prompt'] || '';
-                    const userPrompt = testPromptTemplates[templateName]['User Prompt'] || '';
-                    templateContent = systemPrompt ? `${systemPrompt}\n\n${userPrompt}` : userPrompt;
-                }
-                console.log('✅ Template found in testPromptTemplates, content length:', templateContent.length);
-            } else if (!templateContent) {
-                // Try to fetch from backend API
+
+            if (!rawContent && testPromptTemplates && testPromptTemplates[templateName]) {
+                rawContent = testPromptTemplates[templateName];
+            } else if (!rawContent) {
                 console.log('⚠️ Template not found in local cache, fetching from backend...');
-                try {
-                    let response;
-                    // Try window.API.getPromptTemplates first, fallback to direct fetch
-                    if (window.API && typeof window.API.getPromptTemplates === 'function') {
-                        console.log('[app.js] ✅ Using window.API.getPromptTemplates');
-                        response = await window.API.getPromptTemplates();
-                    } else {
-                        console.warn('[app.js] ⚠️ window.API.getPromptTemplates not available, using direct fetch call');
-                        const apiResponse = await fetch('http://127.0.0.1:8000/api/test-script/prompts', {
-                            method: 'GET',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            }
-                        });
-                        
-                        if (!apiResponse.ok) {
-                            throw new Error(`HTTP error! status: ${apiResponse.status}`);
-                        }
-                        
-                        response = await apiResponse.json();
+                let response;
+                if (window.API && typeof window.API.getPromptTemplates === 'function') {
+                    response = await window.API.getPromptTemplates();
+                } else {
+                    const apiResponse = await fetch('http://127.0.0.1:8000/api/test-script/prompts', {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    if (!apiResponse.ok) {
+                        throw new Error(`HTTP error! status: ${apiResponse.status}`);
                     }
-                    
-                    if (response && response.success && response.templates && response.templates[templateName]) {
-                        if (typeof response.templates[templateName] === 'string') {
-                            templateContent = response.templates[templateName];
-                        } else if (typeof response.templates[templateName] === 'object') {
-                            const systemPrompt = response.templates[templateName]['System Prompt'] || '';
-                            const userPrompt = response.templates[templateName]['User Prompt'] || '';
-                            templateContent = systemPrompt ? `${systemPrompt}\n\n${userPrompt}` : userPrompt;
-                        }
-                        // Cache it for future use
-                        if (!testPromptTemplates) {
-                            testPromptTemplates = {};
-                        }
-                        testPromptTemplates[templateName] = response.templates[templateName];
-                        console.log('✅ Template fetched from backend and cached, content length:', templateContent.length);
-                    } else {
-                        console.warn('⚠️ Template not found in backend response:', templateName);
-                        templateContent = `Template "${templateName}"content not available.`;
-                    }
-                } catch (apiError) {
-                    console.error('❌ Error fetching template from backend:', apiError);
-                    templateContent = `Error loading template: ${apiError.message}`;
+                    response = await apiResponse.json();
+                }
+
+                if (response && response.success && response.templates && response.templates[templateName]) {
+                    rawContent = response.templates[templateName];
+                    if (!testPromptTemplates) testPromptTemplates = {};
+                    testPromptTemplates[templateName] = rawContent;
                 }
             }
-            
-            // Display the template content
-            if (templateContent) {
-                promptTextArea.innerHTML = `
-                    <h4 style="color: #5d92ff; margin-bottom: 1rem; font-weight: 600;">${templateName}</h4>
-                    <pre style="background: #f6f6fa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 1rem; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; line-height: 1.5; color: #1f2937; max-height: 500px; overflow-y: auto;">${escapeHtml(templateContent)}</pre>
-                `;
-                
-                currentPromptTemplateKey = templateName;
-                currentPromptTemplateContent = templateContent;
-                isPromptTemplateModified = false;
-                isCurrentTemplateUserTemplate = isUserTemplate;
-                
-                // Show modify button
-    if (promptModifyBtn) {
-                    promptModifyBtn.style.display = 'inline-block';
-                }
-                if (promptSaveBtn) {
-                    promptSaveBtn.style.display = 'none';
-                }
-                
-                console.log('✅ Template displayed:', templateName, 'isUserTemplate:', isUserTemplate);
+
+            if (rawContent) {
+                renderPromptDetailPanel(templateName, rawContent, isUserTemplate);
+                restoreActiveCategoryCardHighlight();
+                if (empty) empty.hidden = true;
+                console.log('✅ Template displayed:', templateName);
             } else {
-                promptTextArea.innerHTML = '<p style="color: #dc3545; text-align: center; margin-top: 2rem;">Template content not available</p>';
+                showPromptDetailEmpty();
+                if (empty) {
+                    empty.hidden = false;
+                    empty.innerHTML = `<p>Template "${escapeHtml(templateName)}" content not available.</p>`;
+                }
             }
-            
         } catch (error) {
             console.error('❌ Error loading template:', error);
-            promptTextArea.innerHTML = `<p style="color: #dc3545; text-align: center; margin-top: 2rem;">Error loading template: ${error.message}</p>`;
+            showPromptDetailEmpty();
+            const emptyEl = document.getElementById('promptDetailEmpty');
+            if (emptyEl) {
+                emptyEl.hidden = false;
+                emptyEl.innerHTML = `<p>Error loading template: ${escapeHtml(error.message)}</p>`;
+            }
         }
+    }
+
+    function enablePromptTemplateEditing() {
+        if (!currentPromptTemplateKey) {
+            showStatusBar('Please select a template first', 'warning');
+            return;
+        }
+        setPromptDetailReadonly(false);
+        const saveBtn = document.getElementById('promptSaveBtn');
+        if (saveBtn) saveBtn.style.display = 'inline-block';
+        isPromptTemplateModified = false;
+    }
+
+    function getPromptEditorContent() {
+        const systemEl = document.getElementById('promptSystemPrompt');
+        const userEl = document.getElementById('promptUserPrompt');
+        const system = systemEl ? systemEl.value.trim() : '';
+        const user = userEl ? userEl.value.trim() : '';
+        if (system && user) {
+            return { combined: `${system}\n\n${user}`, system, user, isSplit: true };
+        }
+        return { combined: system || user, system, user, isSplit: false };
     }
     
     // Template buttons functionality - Enhanced with backend save
@@ -13513,118 +15379,116 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
     let isPromptTemplateModified = false;
     let isCurrentTemplateUserTemplate = false;
 
-    if (promptModifyBtn) {
-        promptModifyBtn.addEventListener('click', function() {
-            if (promptTextAreaCheck && currentPromptTemplateKey) {
-                console.log('🔧 Modify button clicked for template:', currentPromptTemplateKey);
-                
-                // Extract current content from the pre tag
-                const preElement = promptTextAreaCheck.querySelector('pre');
-                if (preElement) {
-                    currentPromptTemplateContent = preElement.textContent;
-                    
-                    // Replace with editable textarea
-                    const titleElement = promptTextAreaCheck.querySelector('h4');
-                    const titleText = titleElement ? titleElement.textContent : 'Template Content';
-                    
-                    promptTextAreaCheck.innerHTML = `
-                        <h4 style="color: #5d92ff; margin-bottom: 1rem;">${titleText}</h4>
-                        <textarea id="editablePromptContent"style="width: 100%; min-height: 400px; padding: 1rem; background-color: #ffffff; color: #1f2937; border: 2px solid #5d92ff; border-radius: 8px; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; line-height: 1.5; resize: vertical;">${currentPromptTemplateContent}</textarea>
-                    `;
-                    
-                    // Focus on textarea
-                    const editableArea = document.getElementById('editablePromptContent');
-                    if (editableArea) {
-                        editableArea.focus();
-                        
-                        // Track changes
-                        editableArea.addEventListener('input', function() {
-                            isPromptTemplateModified = true;
-                            if (promptSaveBtn) {
-                                promptSaveBtn.style.display = 'inline-block';
-                                promptSaveBtn.disabled = false;
-                            }
-                        });
+    function wirePromptFieldChangeTracking() {
+        ['promptSystemPrompt', 'promptUserPrompt'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el || el.dataset.changeWired === '1') return;
+            el.dataset.changeWired = '1';
+            el.addEventListener('input', function() {
+                if (!el.hasAttribute('readonly')) {
+                    isPromptTemplateModified = true;
+                    const saveBtn = document.getElementById('promptSaveBtn');
+                    if (saveBtn) {
+                        saveBtn.style.display = 'inline-block';
+                        saveBtn.disabled = false;
                     }
-
-                    // Hide Modify button, show Save button
-                    if (promptModifyBtn) promptModifyBtn.style.display = 'none';
-                    if (promptSaveBtn) {
-                        promptSaveBtn.style.display = 'inline-block';
-                    }
-                    
-                    console.log('✅ Template editing enabled');
-                } else {
-                    showStatusBar('Please select a template first', 'warning');
                 }
+            });
+        });
+    }
+    wirePromptFieldChangeTracking();
+
+    const promptEditBtn = document.getElementById('promptEditBtn');
+    if (promptModifyBtn) {
+        promptModifyBtn.addEventListener('click', enablePromptTemplateEditing);
+    }
+    if (promptEditBtn) {
+        promptEditBtn.addEventListener('click', enablePromptTemplateEditing);
+    }
+    const promptNewBtn = document.getElementById('promptNewBtn');
+    if (promptNewBtn) {
+        promptNewBtn.addEventListener('click', function() {
+            if (!currentSelectedRole) {
+                showStatusBar('Select a role first', 'warning');
+                return;
+            }
+            openAddTemplateModal(currentSelectedRole);
+        });
+    }
+
+    const promptTestBtn = document.getElementById('promptTestBtn');
+    if (promptTestBtn) {
+        promptTestBtn.addEventListener('click', function() {
+            if (!currentPromptTemplateKey) {
+                showStatusBar('Select a template to test', 'warning');
+                return;
+            }
+            showStatusBar(`Test prompt: "${currentPromptTemplateKey}" (preview only)`, 'info');
+        });
+    }
+
+    const promptDeleteBtn = document.getElementById('promptDeleteBtn');
+    if (promptDeleteBtn) {
+        promptDeleteBtn.addEventListener('click', function() {
+            if (!currentPromptTemplateKey || !isCurrentTemplateUserTemplate || !currentSelectedRole) {
+                showStatusBar('Only custom user templates can be deleted here', 'warning');
+                return;
+            }
+            if (!confirm(`Delete template "${currentPromptTemplateKey}"?`)) return;
+            if (deleteUserTemplate(currentSelectedRole, currentPromptTemplateKey)) {
+                showStatusBar(`Template "${currentPromptTemplateKey}" deleted`, 'success');
+                clearPromptDetailPanel();
+                currentPromptTemplateKey = null;
+                showTemplateCategoriesForRole(currentSelectedRole);
             } else {
-                showStatusBar('Please select a template first', 'warning');
+                showStatusBar('Failed to delete template', 'error');
             }
         });
     }
+
     if (promptSaveBtn) {
         promptSaveBtn.addEventListener('click', async function(e) {
             e.preventDefault();
             e.stopPropagation();
             console.log('💾 Save button clicked for template:', currentPromptTemplateKey);
             if (currentPromptTemplateKey && isPromptTemplateModified) {
-                const editableArea = document.getElementById('editablePromptContent');
-                if (editableArea) {
-                    const updatedContent = editableArea.value.trim();
-                    
-                    if (!updatedContent) {
-                        showStatusBar('Template content cannot be empty', 'warning');
-                        return;
-                    }
-                    
-                    try {
-                        // Disable button during save
+                const editorContent = getPromptEditorContent();
+                const contentToSave = editorContent.combined;
+
+                if (!contentToSave) {
+                    showStatusBar('Template content cannot be empty', 'warning');
+                    return;
+                }
+
+                const savedRaw = editorContent.isSplit
+                    ? { 'System Prompt': editorContent.system, 'User Prompt': editorContent.user }
+                    : contentToSave;
+
+                try {
                         this.disabled = true;
                         this.textContent = 'Saving...';
-                        
-                        // Check if it's a user template - save to localStorage instead of backend
+
                         if (isCurrentTemplateUserTemplate && currentSelectedRole) {
                             console.log(`🚀 Saving user template '${currentPromptTemplateKey}' to localStorage...`);
-                            if (saveUserTemplate(currentSelectedRole, currentPromptTemplateKey, updatedContent)) {
-                                showStatusBar(`Template '${currentPromptTemplateKey}'saved successfully!`, 'success');
-                                
-                                // Update currentPromptTemplateContent
-                                currentPromptTemplateContent = updatedContent;
-                                
-                                // Revert to read-only view
-                                const titleText = `${currentPromptTemplateKey} Template`;
-                                const promptTextArea = document.getElementById('templateTextArea');
-                                if (promptTextArea) {
-                                    promptTextArea.innerHTML = `
-                                        <h4 style="color: #5d92ff; margin-bottom: 1rem; font-weight: 600;">${escapeHtml(titleText)}</h4>
-                                        <div style="background-color: #ffffff; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 8px; margin-top: 1rem; max-height: 400px; overflow-y: auto;">
-                                            <pre style="color: #1f2937; white-space: pre-wrap; margin: 0; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; line-height: 1.5;">${escapeHtml(updatedContent)}</pre>
-                                        </div>
-                                    `;
-                                }
-                                
-                                // Reset button states
-                                if (promptModifyBtn) {
-                                    promptModifyBtn.style.display = 'inline-block';
-                                    promptModifyBtn.disabled = false;
-                                }
+                            if (saveUserTemplate(currentSelectedRole, currentPromptTemplateKey, contentToSave)) {
+                                showStatusBar(`Template '${currentPromptTemplateKey}' saved successfully!`, 'success');
+                                currentPromptTemplateContent = contentToSave;
+                                currentPromptTemplateRaw = contentToSave;
+                                renderPromptDetailPanel(currentPromptTemplateKey, contentToSave, true);
                                 this.style.display = 'none';
                                 this.disabled = false;
-                                this.textContent = 'Save';
+                                this.textContent = 'Save Prompt';
                                 isPromptTemplateModified = false;
-                                
-                                console.log('✅ User template saved successfully');
+                                showTemplateCategoriesForRole(currentSelectedRole);
+                                restoreActiveCategoryCardHighlight();
                                 return;
-                            } else {
-                                throw new Error('Failed to save user template to localStorage');
                             }
+                            throw new Error('Failed to save user template to localStorage');
                         }
-                        
-                        // Save to backend - use direct fetch (same pattern as other working endpoints)
+
                         console.log(`🚀 Saving template '${currentPromptTemplateKey}' to backend...`);
-                        console.log('  - Template name:', currentPromptTemplateKey);
-                        console.log('  - Content length:', updatedContent.length);
-                        
+                        console.log('  - Content length:', contentToSave.length);
+
                         const fetchResponse = await fetch('http://127.0.0.1:8000/api/test-script/save-template', {
                             method: 'POST',
                             headers: {
@@ -13632,7 +15496,7 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
                             },
                             body: JSON.stringify({
                                 template_name: currentPromptTemplateKey,
-                                template_content: updatedContent
+                                template_content: contentToSave
                             })
                         });
                         
@@ -13675,38 +15539,16 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
                         console.log('✅ Save template successful:', response);
                         
                         if (response.success) {
-                            // Update local templates
-                            testPromptTemplates[currentPromptTemplateKey] = updatedContent;
-                            
-                            // Show success message
-                            showStatusBar(`Template '${currentPromptTemplateKey}'saved successfully!`, 'success');
-                            
-                            // Update currentPromptTemplateContent for future edits
-                            currentPromptTemplateContent = updatedContent;
-                            
-                            // Revert to read-only view
-                            const titleText = `${currentPromptTemplateKey} Template`;
-                            const promptTextArea = document.getElementById('templateTextArea');
-                            if (promptTextArea) {
-                            promptTextArea.innerHTML = `
-                                    <h4 style="color: #5d92ff; margin-bottom: 1rem; font-weight: 600;">${escapeHtml(titleText)}</h4>
-                                <div style="background-color: #ffffff; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 8px; margin-top: 1rem; max-height: 400px; overflow-y: auto;">
-                                        <pre style="color: #1f2937; white-space: pre-wrap; margin: 0; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; line-height: 1.5;">${escapeHtml(updatedContent)}</pre>
-                                </div>
-                            `;
-                            }
-                            
-                            // Reset button states - show Modify, hide Save
-                            if (promptModifyBtn) {
-                                promptModifyBtn.style.display = 'inline-block';
-                                promptModifyBtn.disabled = false;
-                            }
+                            testPromptTemplates[currentPromptTemplateKey] = savedRaw;
+                            showStatusBar(`Template '${currentPromptTemplateKey}' saved successfully!`, 'success');
+                            currentPromptTemplateContent = contentToSave;
+                            currentPromptTemplateRaw = savedRaw;
+                            renderPromptDetailPanel(currentPromptTemplateKey, savedRaw, false);
+                            restoreActiveCategoryCardHighlight();
                             this.style.display = 'none';
                             this.disabled = false;
-                            this.textContent = 'Save';
-                            
+                            this.textContent = 'Save Prompt';
                             isPromptTemplateModified = false;
-                            
                             console.log('✅ Template saved successfully');
                         } else {
                             throw new Error(response.message || 'Failed to save template');
@@ -13730,11 +15572,9 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
                             showStatusBar(`Error saving template: ${errorMsg}`, 'error');
                         }
                         
-                        // Re-enable button
                         this.disabled = false;
-                        this.textContent = 'Save';
+                        this.textContent = 'Save Prompt';
                     }
-                }
             } else {
                 showStatusBar('No changes to save', 'info');
             }
@@ -14041,6 +15881,7 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
 
     // Test Script Generator button event listeners
     const loadTestDatasetBtn = document.getElementById('loadTestDatasetBtn');
+    const resetTestDatasetBtn = document.getElementById('resetTestDatasetBtn');
     const testDatasetUpload = document.getElementById('testDatasetUpload');
     const testDatasetFiles = document.getElementById('testDatasetFiles');
     
@@ -14057,6 +15898,39 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
             } else {
                 // Priority 3: No dataset and no files selected, open file picker
                 testDatasetFiles.click();
+            }
+        });
+    }
+
+    if (resetTestDatasetBtn) {
+        resetTestDatasetBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            try {
+                // Clear selected files from the hidden input
+                if (testDatasetFiles) {
+                    const dt = new DataTransfer();
+                    testDatasetFiles.files = dt.files;
+                    testDatasetFiles.value = '';
+                }
+
+                // Clear any loaded dataset content
+                currentTestDataset = null;
+
+                // Reset UI back to empty state
+                hideSelectedFiles();
+                if (loadTestDatasetBtn) {
+                    loadTestDatasetBtn.disabled = false;
+                    loadTestDatasetBtn.textContent = 'Load';
+                    loadTestDatasetBtn.style.backgroundColor = '';
+                }
+
+                updateTsgStatusBar();
+                showStatusBar('Dataset selection cleared. Choose another file to load.', 'success');
+            } catch (err) {
+                console.error('Failed to reset dataset selection:', err);
+                showStatusBar('Failed to reset dataset selection', 'error');
             }
         });
     }
@@ -14923,7 +16797,16 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
                     buttonSpan.textContent = 'All Activities';
                 }
             }
+            clearHistoryDetailPanel();
             loadUserHistory({ forceRefresh: true });
+        });
+    }
+
+    const exportHistoryBtn = document.getElementById('exportHistoryBtn');
+    if (exportHistoryBtn) {
+        exportHistoryBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            exportUserHistoryCsv();
         });
     }
 
@@ -15097,6 +16980,7 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
             
             // Clear the stored dataset folder path
             currentDatasetFolderPath = null;
+            currentTotalContentFilePath = null;
             
             console.log('✅ Open Dataset button hidden');
         }
@@ -15529,6 +17413,95 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
     const loadDeploymentConfigBtn = document.getElementById('loadDeploymentConfigBtn');
     const deploymentConfigStatus = document.getElementById('deploymentConfigStatus');
     const deploymentConfigFileList = document.getElementById('deploymentConfigFileList');
+    const tdTopologyValue = document.getElementById('tdTopologyValue');
+    const tdTopologyRadios = Array.from(document.querySelectorAll('input[name="tdTopologyOption"]'));
+    const tdTopologyNodeTag = document.getElementById('tdTopologyNodeTag');
+    const tdTopologyVisualLink = document.getElementById('tdTopologyVisualLink');
+    const tdTopologyVisualSection = document.getElementById('tdTopologyVisualSection');
+    const tdTopologyParamsSection = document.getElementById('tdTopologyParamsSection');
+
+    function updateDeploymentTopologyVisual(value) {
+        if (!tdTopologyVisualLink) return;
+        if (value === '5g') {
+            if (tdTopologyVisualSection) tdTopologyVisualSection.style.display = 'flex';
+            if (tdTopologyParamsSection) tdTopologyParamsSection.style.display = 'flex';
+            if (tdTopologyNodeTag) tdTopologyNodeTag.textContent = 'OAI';
+            tdTopologyVisualLink.textContent = 'RF Simulator';
+            tdTopologyVisualLink.classList.add('td-topology-mid-link--muted');
+            return;
+        }
+        if (value === 'simulator') {
+            if (tdTopologyVisualSection) tdTopologyVisualSection.style.display = 'flex';
+            if (tdTopologyParamsSection) tdTopologyParamsSection.style.display = 'flex';
+            if (tdTopologyNodeTag) tdTopologyNodeTag.textContent = 'Simunous';
+            tdTopologyVisualLink.textContent = 'air interface';
+            tdTopologyVisualLink.classList.remove('td-topology-mid-link--muted');
+            return;
+        }
+        if (tdTopologyVisualSection) tdTopologyVisualSection.style.display = 'none';
+        if (tdTopologyParamsSection) tdTopologyParamsSection.style.display = 'none';
+        if (tdTopologyNodeTag) tdTopologyNodeTag.textContent = '';
+        tdTopologyVisualLink.textContent = 'Choose 5G or Simulator to view link type';
+        tdTopologyVisualLink.classList.remove('td-topology-mid-link--muted');
+    }
+
+    tdTopologyRadios.forEach((radio) => {
+        radio.addEventListener('change', function() {
+            if (!this.checked) return;
+            if (tdTopologyValue) tdTopologyValue.value = this.value;
+            updateDeploymentTopologyVisual(this.value);
+        });
+    });
+    const initialTopology = tdTopologyRadios.find((radio) => radio.checked)?.value || tdTopologyValue?.value || 'all';
+    updateDeploymentTopologyVisual(initialTopology);
+
+    initPortalSelectDropdown({
+        dropdownId: 'tdSubcarrierSpacingDropdown',
+        btnId: 'tdSubcarrierSpacingBtn',
+        menuId: 'tdSubcarrierSpacingDropdownMenu',
+        hiddenId: 'tdParamDistance',
+        labelId: 'tdSubcarrierSpacingBtnLabel',
+        defaultLabel: '1(KHz30)'
+    });
+
+    function closeTdLogLevelSubmenus(exceptPicker = null) {
+        document.querySelectorAll('.td-loglevel-picker.is-open').forEach((picker) => {
+            if (picker !== exceptPicker) picker.classList.remove('is-open');
+        });
+    }
+
+    document.querySelectorAll('.td-loglevel-picker').forEach((picker) => {
+        const triggerBtn = picker.querySelector('.td-loglevel-picker-btn');
+        const valueEl = picker.querySelector('.td-loglevel-picker-value');
+        const items = picker.querySelectorAll('.td-loglevel-subitem');
+        if (!triggerBtn || !valueEl || !items.length) return;
+
+        triggerBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const willOpen = !picker.classList.contains('is-open');
+            closeTdLogLevelSubmenus();
+            if (willOpen) picker.classList.add('is-open');
+        });
+
+        items.forEach((item) => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const value = item.getAttribute('data-value') || item.textContent.trim().toLowerCase();
+                valueEl.textContent = value;
+                items.forEach((el) => el.classList.remove('is-selected'));
+                item.classList.add('is-selected');
+                picker.classList.remove('is-open');
+            });
+        });
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.td-loglevel-picker')) {
+            closeTdLogLevelSubmenus();
+        }
+    });
     
     if (deploymentConfigFiles && loadDeploymentConfigBtn) {
         // Handle click on Load Config button
@@ -15706,6 +17679,66 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
         handleDeploymentConfigFileSelection();
         console.log('✅ Deployment buttons initialized');
     }
+    function collectTestDeploymentConfParams() {
+        const absoluteFrequencySSB = document.getElementById('tdParamBand')?.value?.trim() || '641280';
+        const frequencyBand = document.getElementById('tdParamPrbs')?.value?.trim() || '78';
+        const subcarrierSpacing = document.getElementById('tdParamDistance')?.value?.trim() ?? '1';
+
+        const layerOrder = ['rrc', 'rlc', 'mac', 'pdcp'];
+        const pickers = document.querySelectorAll('.td-loglevel-picker');
+        const logLevels = {};
+        pickers.forEach((picker, index) => {
+            const layer = layerOrder[index];
+            if (!layer) return;
+            const valueEl = picker.querySelector('.td-loglevel-picker-value');
+            logLevels[layer] = (valueEl?.textContent || 'info').trim().toLowerCase();
+        });
+
+        return {
+            absoluteFrequencySSB,
+            frequencyBand,
+            subcarrierSpacing,
+            logLevels
+        };
+    }
+
+    function formatCuSimnovusConfChangeSummary(changes) {
+        if (!Array.isArray(changes) || !changes.length) return '';
+        const seen = new Set();
+        const parts = [];
+        changes.forEach((c) => {
+            if (!c || c.via === 'key') return;
+            const key = `${c.field}:${c.value}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            parts.push(`${c.field}=${c.value}`);
+        });
+        return parts.length ? `${parts.length} setting(s): ${parts.join(', ')}` : `${changes.length} line(s) updated`;
+    }
+
+    async function applyCuSimnovusConfFromUI() {
+        const params = collectTestDeploymentConfParams();
+        if (!window.API || typeof window.API.applyCuSimnovusConf !== 'function') {
+            throw new Error('Config update is not available (Electron bridge missing).');
+        }
+        const result = await window.API.applyCuSimnovusConf(params, { openAfterWrite: false });
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to update cu_simnovus.conf');
+        }
+        return result;
+    }
+
+    async function transferCuSimnovusConfFromLocal() {
+        if (!window.API || typeof window.API.transferCuSimnovusConf !== 'function') {
+            throw new Error('Config transfer is not available (Electron bridge missing). Run the app with npm start.');
+        }
+        const result = await window.API.transferCuSimnovusConf();
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to transfer cu_simnovus.conf to remote host');
+        }
+        return result;
+    }
+
     // Deployment functions
     async function deployTestScripts() {
         try {
@@ -15713,12 +17746,10 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
             
             const deploymentStatus = document.getElementById('deploymentStatus');
             
-            if (deploymentStatus) {
-                deploymentStatus.textContent = 'Starting deployment...\n';
-                deploymentStatus.style.color = '#e2e8f0';
-            }
             const logBadge = document.getElementById('deploymentLogBadge');
             const logRunLabel = document.getElementById('deploymentLogRunLabel');
+            const footerStatus = document.getElementById('deploymentFooterStatus');
+
             if (logBadge) {
                 logBadge.textContent = 'Running';
                 logBadge.className = 'td-badge td-badge--pending';
@@ -15726,93 +17757,65 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
             if (logRunLabel) {
                 logRunLabel.textContent = 'Run #0 · deploying';
             }
-            
-            showStatusBar('Starting deployment...', 'info', 'Deployment');
-            
-            // Try window.API.deployTestScripts first, fallback to direct fetch (like dataset generator)
-            let response;
-            if (window.API && typeof window.API.deployTestScripts === 'function') {
-                console.log('[app.js] ✅ Using window.API.deployTestScripts');
-                response = await window.API.deployTestScripts();
-            } else {
-                console.warn('[app.js] ⚠️ window.API.deployTestScripts not available, using direct fetch call');
-                const requestData = {
-                    config_name: "default",
-                    custom_config: null
-                };
-                
-                const fetchResponse = await fetch('http://127.0.0.1:8000/api/deployment/deploy', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(requestData)
-                });
-                
-                if (!fetchResponse.ok) {
-                    const errorText = await fetchResponse.text();
-                    throw new Error(`HTTP error! status: ${fetchResponse.status} - ${errorText}`);
-                }
-                
-                response = await fetchResponse.json();
-                console.log('[app.js] ✅ Direct fetch deployTestScripts successful, result:', response);
+
+            if (deploymentStatus) {
+                deploymentStatus.textContent = 'Applying configuration to ~/Config/cu_simnovus.conf...\n';
+                deploymentStatus.style.color = '#e2e8f0';
             }
-            
-            console.log('✅ Deployment API response:', response);
-            
-            if (response.success) {
-                currentDeploymentJobId = response.job_id;
-                console.log('✅ Deployment started, job ID:', currentDeploymentJobId);
-                
-                if (deploymentStatus) {
-                    deploymentStatus.textContent += `Deployment started successfully!\nJob ID: ${currentDeploymentJobId}\nMonitoring progress...\n\n`;
+
+            const confPatchResult = await applyCuSimnovusConfFromUI();
+            console.log('✅ cu_simnovus.conf updated:', confPatchResult);
+
+            if (deploymentStatus) {
+                const src = confPatchResult.sourcePath || 'cu_simnovus_default.conf';
+                deploymentStatus.textContent += `Template: ${src}\n`;
+                deploymentStatus.textContent += `Written: ${confPatchResult.confPath}\n`;
+                const summary = formatCuSimnovusConfChangeSummary(confPatchResult.changes);
+                if (summary) {
+                    deploymentStatus.textContent += `${summary}\n\n`;
+                } else {
+                    deploymentStatus.textContent += '\n';
                 }
-                
-                showStatusBar('Deployment started successfully', 'info', 'Deployment');
-                
-                // Start polling for status
-                if (deploymentStatusInterval) {
-                    clearInterval(deploymentStatusInterval);
-                }
-                
-                deploymentStatusInterval = setInterval(async () => {
-                    try {
-                        let status;
-                        if (window.API && typeof window.API.getDeploymentStatus === 'function') {
-                            status = await window.API.getDeploymentStatus(currentDeploymentJobId);
-                        } else {
-                            // Fallback to direct fetch
-                            const fetchResponse = await fetch(`http://127.0.0.1:8000/api/deployment/status/${currentDeploymentJobId}`, {
-                                method: 'GET',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                }
-                            });
-                            
-                            if (!fetchResponse.ok) {
-                                const errorText = await fetchResponse.text();
-                                throw new Error(`HTTP error! status: ${fetchResponse.status} - ${errorText}`);
-                            }
-                            
-                            status = await fetchResponse.json();
-                        }
-                        
-                        updateDeploymentStatus(status);
-                        
-                        // Stop polling if deployment is complete or failed
-                        if (status.status === 'completed'|| status.status === 'failed') {
-                            clearInterval(deploymentStatusInterval);
-                            deploymentStatusInterval = null;
-                        }
-                    } catch (error) {
-                        console.error('Error polling deployment status:', error);
-                        clearInterval(deploymentStatusInterval);
-                        deploymentStatusInterval = null;
-                    }
-                }, 2000); // Poll every 2 seconds
-            } else {
-                throw new Error(response.message || 'Deployment failed to start');
+                deploymentStatus.textContent += 'Transferring to 10.138.77.95...\n';
             }
+
+            showStatusBar('Configuration saved locally', 'success', 'Test Deployment');
+
+            const transferResult = await transferCuSimnovusConfFromLocal();
+            console.log('✅ cu_simnovus.conf transferred:', transferResult);
+
+            // Python transfer returns snake_case keys; keep compatibility with older camelCase.
+            const localPath = transferResult.local_source || transferResult.localSource;
+            const remotePath = transferResult.remote_path || transferResult.remotePath;
+            const remoteBackupPath = transferResult.remote_backup_path || transferResult.remoteBackupPath;
+
+            let statusText = 'Deployment completed successfully!\n\n';
+            statusText += `Local: ${localPath}\n`;
+            statusText += `Remote: ${remotePath}\n`;
+            if (remoteBackupPath) {
+                statusText += `Backup: ${remoteBackupPath}\n`;
+            }
+            if (Array.isArray(transferResult.steps) && transferResult.steps.length) {
+                statusText += '\nSteps:\n' + transferResult.steps.map((s) => `  • ${s}`).join('\n') + '\n';
+            }
+
+            if (deploymentStatus) {
+                deploymentStatus.textContent = statusText;
+                deploymentStatus.style.color = '#86efac';
+            }
+            if (logBadge) {
+                logBadge.textContent = 'Complete';
+                logBadge.className = 'td-badge td-badge--complete';
+            }
+            if (logRunLabel) {
+                logRunLabel.textContent = 'Run #0 · deployed';
+            }
+            if (footerStatus) {
+                footerStatus.textContent = 'Config deployed to 10.138.77.95';
+                footerStatus.className = 'td-log-footer-status td-log-footer-status--success';
+            }
+
+            showStatusBar('Config transferred to 10.138.77.95', 'success', 'Deployment');
         } catch (error) {
             console.error('❌ Deployment failed:', error);
             const deploymentStatus = document.getElementById('deploymentStatus');
