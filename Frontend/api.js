@@ -4,6 +4,59 @@
 // Backend API Configuration
 const API_BASE_URL = 'http://127.0.0.1:8000';
 
+/**
+ * Parse FastAPI 422 guardrail rejection bodies (upload / dataset load).
+ * Returns structured fields for UI modals regardless of which upload code path ran.
+ */
+function parseGuardrailHttpErrorBody(errorText) {
+    const result = {
+        message: errorText,
+        guardrailDetail: null,
+        guardrailFindings: [],
+        guardrailReasons: [],
+        isGuardrailBlock: false,
+    };
+    try {
+        const parsed = JSON.parse(errorText);
+        const detail = parsed.detail;
+        if (typeof detail === 'object' && detail !== null) {
+            result.guardrailDetail = detail;
+            result.guardrailFindings = detail.findings
+                || detail.guardrails?.scan?.findings
+                || [];
+            result.guardrailReasons = Array.isArray(detail.reasons) ? detail.reasons : [];
+            result.message = detail.message || result.message;
+            if (detail.error) {
+                result.isGuardrailBlock = detail.error === 'document_blocked_by_guardrails';
+                result.message = `${detail.error}: ${result.message}`;
+            }
+            if (result.guardrailReasons.length) {
+                result.message += ` (${result.guardrailReasons.join('; ')})`;
+            }
+        } else if (typeof detail === 'string') {
+            result.message = detail;
+        }
+    } catch (_e) {
+        /* use raw errorText */
+    }
+    return result;
+}
+
+function attachGuardrailFieldsToError(err, errorText) {
+    const info = parseGuardrailHttpErrorBody(errorText);
+    err.guardrailDetail = info.guardrailDetail;
+    err.guardrailFindings = info.guardrailFindings;
+    err.guardrailReasons = info.guardrailReasons;
+    err.isGuardrailBlock = info.isGuardrailBlock;
+    return err;
+}
+
+if (typeof window !== 'undefined') {
+    if (!window.API) window.API = {};
+    window.API.parseGuardrailHttpErrorBody = parseGuardrailHttpErrorBody;
+    window.API.attachGuardrailFieldsToError = attachGuardrailFieldsToError;
+}
+
 // Generic API call helper
 async function makeAPICall(endpoint, method = 'GET', data = null) {
     try {
@@ -120,7 +173,10 @@ async function uploadDocument(file) {
         if (!response.ok) {
             const errorText = await response.text();
             console.error('API error response:', errorText);
-            throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+            const info = parseGuardrailHttpErrorBody(errorText);
+            const err = new Error(`HTTP error! status: ${response.status} - ${info.message}`);
+            attachGuardrailFieldsToError(err, errorText);
+            throw err;
         }
         
         const result = await response.json();
@@ -221,7 +277,27 @@ async function generateDatasetPyQtStyle(fileId, section, subsection, workingDir,
     
     if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        let detailMessage = errorText;
+        let outputGuardrails = null;
+        try {
+            const parsed = JSON.parse(errorText);
+            const detail = parsed.detail;
+            if (typeof detail === 'string') {
+                detailMessage = detail;
+            } else if (typeof detail === 'object' && detail?.message) {
+                detailMessage = detail.message;
+                if (detail.error === 'dataset_output_guardrails_failed' && Array.isArray(detail.reasons) && detail.reasons.length) {
+                    const preview = detail.reasons.slice(0, 4).join('; ');
+                    detailMessage = `${detail.message} ${preview}`;
+                }
+                outputGuardrails = detail.output_guardrails || null;
+            }
+        } catch (_e) { /* use raw */ }
+        const err = new Error(`HTTP error! status: ${response.status}, message: ${detailMessage}`);
+        if (outputGuardrails) {
+            err.outputGuardrails = outputGuardrails;
+        }
+        throw err;
     }
     
     return await response.json();
@@ -340,7 +416,30 @@ async function uploadMultipleFiles(endpoint, files, additionalData = {}) {
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorText = await response.text();
+            let detailMessage = errorText;
+            let outputGuardrails = null;
+            try {
+                const parsed = JSON.parse(errorText);
+                const detail = parsed.detail;
+                if (typeof detail === 'string') {
+                    detailMessage = detail;
+                } else if (typeof detail === 'object' && detail?.message) {
+                    detailMessage = detail.message;
+                    if (detail.error === 'document_blocked_by_guardrails' && Array.isArray(detail.reasons) && detail.reasons.length) {
+                        detailMessage = `${detail.message} ${detail.reasons.slice(0, 3).join('; ')}`;
+                    }
+                    if (detail.error === 'dataset_output_guardrails_failed' && Array.isArray(detail.reasons) && detail.reasons.length) {
+                        detailMessage = `${detail.message} ${detail.reasons.slice(0, 3).join('; ')}`;
+                    }
+                    outputGuardrails = detail.output_guardrails || null;
+                }
+            } catch (_e) { /* use raw */ }
+            const err = new Error(`HTTP error! status: ${response.status}, message: ${detailMessage}`);
+            if (outputGuardrails) {
+                err.outputGuardrails = outputGuardrails;
+            }
+            throw err;
         }
 
         return await response.json();

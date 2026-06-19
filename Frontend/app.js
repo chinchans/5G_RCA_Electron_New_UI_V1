@@ -90,6 +90,163 @@ function hideStatusBar() {
     }
 }
 
+function showGuardrailRejectionModal(findings, reasons = [], title = 'Document blocked by security guardrails') {
+    const rows = Array.isArray(findings) ? findings : [];
+    const reasonLines = Array.isArray(reasons) ? reasons : [];
+
+    const modal = document.createElement('div');
+    modal.id = 'guardrailRejectionModal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 100000;
+    `;
+
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+        background: white;
+        border-radius: 8px;
+        padding: 1.25rem 1.25rem 1rem 1.25rem;
+        width: min(1100px, 92vw);
+        max-height: 82vh;
+        overflow: auto;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    `;
+
+    const safe = window.escapeHtml || ((t) => String(t || ''));
+    const header = `
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap: 1rem;">
+            <div>
+                <div style="font-size: 1.1rem; font-weight: 700; color: #111827;">${safe(title)}</div>
+                <div style="margin-top: 0.35rem; color: #374151; font-size: 0.95rem;">
+                    The document was blocked because the guardrails detected instruction-like or malicious prompt content.
+                </div>
+            </div>
+            <button id="guardrailCloseBtn" style="border: 1px solid #E5E7EB; background: #F9FAFB; padding: 0.4rem 0.6rem; border-radius: 6px; cursor:pointer;">
+                Close
+            </button>
+        </div>
+    `;
+
+    const emptyState = `
+        <div style="margin-top: 1rem; padding: 0.75rem; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 6px; color:#991B1B;">
+            No line-level findings were returned. See summary below.
+        </div>
+        ${reasonLines.length ? `
+            <ul style="margin: 0.75rem 0 0 1.25rem; color:#374151; font-size: 0.92rem;">
+                ${reasonLines.map((r) => `<li>${safe(r)}</li>`).join('')}
+            </ul>
+        ` : ''}
+    `;
+
+    const table = `
+        <div style="margin-top: 1rem;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.92rem;">
+                <thead>
+                    <tr style="text-align:left; background:#F3F4F6;">
+                        <th style="padding: 0.5rem; border-bottom: 1px solid #E5E7EB;">Page</th>
+                        <th style="padding: 0.5rem; border-bottom: 1px solid #E5E7EB;">Paragraph</th>
+                        <th style="padding: 0.5rem; border-bottom: 1px solid #E5E7EB;">Line</th>
+                        <th style="padding: 0.5rem; border-bottom: 1px solid #E5E7EB;">Layer</th>
+                        <th style="padding: 0.5rem; border-bottom: 1px solid #E5E7EB;">Pattern</th>
+                        <th style="padding: 0.5rem; border-bottom: 1px solid #E5E7EB;">Matched text</th>
+                        <th style="padding: 0.5rem; border-bottom: 1px solid #E5E7EB;">Context</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows.slice(0, 50).map((f) => {
+                        const page = (f.page === null || f.page === undefined) ? '-' : String(f.page);
+                        const para = (f.paragraph === null || f.paragraph === undefined) ? '-' : String(f.paragraph);
+                        const line = (f.line === null || f.line === undefined) ? '-' : String(f.line);
+                        const layer = safe(f.layer || '-');
+                        const pattern = safe(f.pattern || '-');
+                        const matched = safe(f.matched_text || '-');
+                        const snippet = safe(f.snippet || '');
+                        return `
+                            <tr>
+                                <td style="padding: 0.5rem; border-bottom: 1px solid #E5E7EB; color:#111827;">${page}</td>
+                                <td style="padding: 0.5rem; border-bottom: 1px solid #E5E7EB; color:#111827;">${para}</td>
+                                <td style="padding: 0.5rem; border-bottom: 1px solid #E5E7EB; color:#111827;">${line}</td>
+                                <td style="padding: 0.5rem; border-bottom: 1px solid #E5E7EB; color:#374151;">${layer}</td>
+                                <td style="padding: 0.5rem; border-bottom: 1px solid #E5E7EB; color:#374151;">${pattern}</td>
+                                <td style="padding: 0.5rem; border-bottom: 1px solid #E5E7EB; color:#B91C1C; font-weight: 600;">${matched}</td>
+                                <td style="padding: 0.5rem; border-bottom: 1px solid #E5E7EB; color:#111827;">${snippet}</td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+            ${rows.length > 50 ? `<div style="margin-top: 0.5rem; color:#6B7280;">Showing first 50 findings.</div>` : ''}
+        </div>
+    `;
+
+    dialog.innerHTML = header + (rows.length ? table : emptyState);
+    modal.appendChild(dialog);
+    document.body.appendChild(modal);
+
+    const close = () => {
+        if (modal && modal.parentNode) {
+            modal.parentNode.removeChild(modal);
+        }
+    };
+    dialog.querySelector('#guardrailCloseBtn')?.addEventListener('click', close);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) close();
+    });
+    document.addEventListener('keydown', function onKey(e) {
+        if (e.key === 'Escape') {
+            document.removeEventListener('keydown', onKey);
+            close();
+        }
+    });
+}
+
+window.showGuardrailRejectionModal = showGuardrailRejectionModal;
+
+function extractGuardrailPayload(error) {
+    if (!error) {
+        return { findings: [], reasons: [], detail: null, isGuardrailBlock: false };
+    }
+    const detail = error.guardrailDetail || null;
+    let findings = error.guardrailFindings
+        || detail?.findings
+        || detail?.guardrails?.scan?.findings
+        || [];
+    let reasons = error.guardrailReasons
+        || detail?.reasons
+        || [];
+    if ((!findings || !findings.length) && reasons.length) {
+        findings = reasons.map((reason) => ({
+            layer: 'summary',
+            pattern: 'guardrail_block',
+            matched_text: reason,
+            line: null,
+            paragraph: null,
+            page: null,
+            snippet: reason,
+            reason,
+        }));
+    }
+    return {
+        findings: Array.isArray(findings) ? findings : [],
+        reasons: Array.isArray(reasons) ? reasons : [],
+        detail,
+        isGuardrailBlock: Boolean(
+            error.isGuardrailBlock || detail?.error === 'document_blocked_by_guardrails'
+        ),
+    };
+}
+
+window.extractGuardrailPayload = extractGuardrailPayload;
+
 function getStatusTitle(type) {
     switch (type) {
         case 'success': return 'Success!';
@@ -6716,25 +6873,53 @@ document.addEventListener('DOMContentLoaded', function() {
         let p = String(inputPath).replace(/\\/g, '/').trim();
         if (isAbsoluteFilesystemPath(p)) return p;
 
-        const rel = p.replace(/^\.?\//, '').replace(/^extract\//, '').replace(/^resources\/extract\//, '');
-        const bases = [];
+        const rel = p
+            .replace(/^\.?\//, '')
+            .replace(/^Backend\//, '')
+            .replace(/^extract\//, '')
+            .replace(/^resources\/extract\//, '');
 
-        if (workingDirectory) {
-            bases.push(String(workingDirectory).replace(/\\/g, '/').replace(/\/$/, ''));
-        }
-        if (specIntelBackendExtractRoot) {
+        const bases = [];
+        if (specIntelBackendExtractRoot && isAbsoluteFilesystemPath(specIntelBackendExtractRoot)) {
             bases.push(String(specIntelBackendExtractRoot).replace(/\\/g, '/').replace(/\/$/, ''));
+        }
+        if (workingDirectory && isAbsoluteFilesystemPath(workingDirectory)) {
+            bases.push(String(workingDirectory).replace(/\\/g, '/').replace(/\/$/, ''));
         }
 
         for (const base of bases) {
-            if (!base || !isAbsoluteFilesystemPath(base)) continue;
-            if (rel.startsWith('datasets/')) {
-                return `${base}/${rel}`;
+            if (!base) continue;
+            if (rel.startsWith('datasets/') || rel.includes('/datasets/')) {
+                return `${base}/${rel.replace(/^.*?datasets\//, 'datasets/')}`;
+            }
+            if (!rel.includes('/')) {
+                return `${base}/datasets/${rel}`;
             }
             return `${base}/${rel}`;
         }
 
         return p;
+    }
+
+    function applyExtractionPathResult(result) {
+        const absTotal = normalizeDatasetFilesystemPath(
+            result?.total_content_file || result?.files_created?.total_content
+        );
+        const absFolder = normalizeDatasetFilesystemPath(
+            result?.dataset_folder
+            || (absTotal ? absTotal.replace(/\/total_content\.txt$/i, '') : null)
+        );
+
+        if (absTotal) {
+            currentTotalContentFilePath = absTotal;
+        }
+        if (absFolder) {
+            currentDatasetFolderPath = absFolder;
+        } else if (absTotal) {
+            currentDatasetFolderPath = absTotal.replace(/\/total_content\.txt$/i, '');
+        }
+
+        return { absTotal, absFolder };
     }
 
     function buildDatasetFolderPathFromSelection() {
@@ -6751,15 +6936,41 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function buildTotalContentFilePathFromSelection() {
+        const direct = normalizeDatasetFilesystemPath(currentTotalContentFilePath);
+        if (direct) return direct;
+
         const folder = currentDatasetFolderPath
             ? normalizeDatasetFilesystemPath(currentDatasetFolderPath)
             : buildDatasetFolderPathFromSelection();
         if (folder) {
             return `${folder.replace(/\/$/, '')}/total_content.txt`;
         }
-        const direct = normalizeDatasetFilesystemPath(currentTotalContentFilePath);
-        if (direct) return direct;
         return null;
+    }
+
+    async function fetchTotalContentFromBackend() {
+        const apiBase = (window.API && window.API.API_BASE_URL) || 'http://127.0.0.1:8000';
+        const attempts = [];
+        const filePath = buildTotalContentFilePathFromSelection();
+        if (filePath) attempts.push({ path: filePath });
+        if (selectedSubsection) attempts.push({ subsection: selectedSubsection });
+
+        if (!attempts.length) return null;
+
+        let lastError = 'total_content.txt not found';
+        for (const query of attempts) {
+            const params = new URLSearchParams(query);
+            try {
+                const response = await fetch(`${apiBase}/api/dataset/total-content?${params.toString()}`);
+                if (response.ok) {
+                    return response.json();
+                }
+                lastError = await response.text();
+            } catch (err) {
+                lastError = err.message || String(err);
+            }
+        }
+        throw new Error(lastError);
     }
 
     /** Count all files in the dataset output folder (clause files + total_content + section file, etc.). */
@@ -6809,6 +7020,128 @@ document.addEventListener('DOMContentLoaded', function() {
         setSpecIntelMetricValue('specIntelMetricDatasetEntries', 0);
         setSpecIntelText('specIntelMetricSectionsMeta', 'from 0 spec documents');
         setSpecIntelAvailableBadge(0);
+    }
+
+    let specIntelUploadSnapshot = null;
+
+    function snapshotSpecIntelDocumentState() {
+        const sectionContent = sectionDropdown?.querySelector('.dropdown-content');
+        const subsectionContent = subsectionDropdown?.querySelector('.dropdown-content');
+        return {
+            currentFileId,
+            selectedDocument,
+            selectedMainSection,
+            selectedSubsection,
+            documentLoaded: Boolean(currentFileId && selectedDocument),
+            sectionBtnText: sectionBtn?.querySelector('span')?.textContent || 'Choose Section',
+            subsectionBtnText: subsectionBtn?.querySelector('span')?.textContent || 'Choose Subsection',
+            sectionDropdownHtml: sectionContent ? sectionContent.innerHTML : '',
+            subsectionDropdownHtml: subsectionContent ? subsectionContent.innerHTML : '',
+            metrics: {
+                sections: document.getElementById('specIntelMetricSections')?.textContent,
+                subsections: document.getElementById('specIntelMetricSubsections')?.textContent,
+                datasetEntries: document.getElementById('specIntelMetricDatasetEntries')?.textContent,
+                sectionsMeta: document.getElementById('specIntelMetricSectionsMeta')?.textContent,
+                badge: document.getElementById('specIntelAvailableBadge')?.textContent,
+            },
+        };
+    }
+
+    function restoreSpecIntelDocumentState(snapshot) {
+        if (!snapshot) return;
+
+        currentFileId = snapshot.currentFileId;
+        selectedDocument = snapshot.selectedDocument;
+        selectedMainSection = snapshot.selectedMainSection;
+        selectedSubsection = snapshot.selectedSubsection;
+
+        if (snapshot.documentLoaded && snapshot.selectedDocument) {
+            updateSpecIntelDocumentUI(true, snapshot.selectedDocument);
+        } else {
+            updateSpecIntelDocumentUI(false);
+        }
+
+        const sectionContent = sectionDropdown?.querySelector('.dropdown-content');
+        const subsectionContent = subsectionDropdown?.querySelector('.dropdown-content');
+        if (sectionContent) sectionContent.innerHTML = snapshot.sectionDropdownHtml || '';
+        if (subsectionContent) subsectionContent.innerHTML = snapshot.subsectionDropdownHtml || '';
+
+        if (sectionBtn) {
+            const span = sectionBtn.querySelector('span');
+            if (span) span.textContent = snapshot.sectionBtnText || 'Choose Section';
+        }
+        if (subsectionBtn) {
+            const span = subsectionBtn.querySelector('span');
+            if (span) span.textContent = snapshot.subsectionBtnText || 'Choose Subsection';
+        }
+
+        if (snapshot.metrics) {
+            setSpecIntelMetricValue('specIntelMetricSections', snapshot.metrics.sections ?? 0);
+            setSpecIntelMetricValue('specIntelMetricSubsections', snapshot.metrics.subsections ?? 0);
+            setSpecIntelMetricValue('specIntelMetricDatasetEntries', snapshot.metrics.datasetEntries ?? 0);
+            setSpecIntelText('specIntelMetricSectionsMeta', snapshot.metrics.sectionsMeta ?? 'from 0 spec documents');
+            const badge = document.getElementById('specIntelAvailableBadge');
+            if (badge && snapshot.metrics.badge) badge.textContent = snapshot.metrics.badge;
+        }
+    }
+
+    function clearSpecIntelSectionSelection(options = {}) {
+        const { fullDocumentReset = false } = options;
+
+        selectedMainSection = null;
+        selectedSubsection = null;
+        updateSectionDropdown([]);
+        updateSubsectionDropdown([]);
+
+        if (sectionBtn) {
+            const span = sectionBtn.querySelector('span');
+            if (span) span.textContent = 'Choose Section';
+        }
+        if (subsectionBtn) {
+            const span = subsectionBtn.querySelector('span');
+            if (span) span.textContent = 'Choose Subsection';
+        }
+
+        resetSpecIntelMetrics();
+        hideSectionProgress();
+        hideSubsectionProgress();
+
+        if (typeof specIntelSubsectionsCache !== 'undefined' && specIntelSubsectionsCache?.clear) {
+            specIntelSubsectionsCache.clear();
+        }
+
+        currentDatasetFolderPath = null;
+        currentTotalContentFilePath = null;
+        if (typeof hideOpenDatasetButton === 'function') {
+            hideOpenDatasetButton();
+        }
+
+        if (fullDocumentReset) {
+            currentFileId = null;
+            selectedDocument = null;
+            updateSpecIntelDocumentUI(false);
+            if (documentInput) documentInput.value = '';
+        }
+    }
+
+    function isSpecIntelGuardrailUploadError(errorMsg) {
+        const msg = String(errorMsg || '').toLowerCase();
+        return msg.includes('document_blocked_by_guardrails')
+            || msg.includes('input security guardrails')
+            || msg.includes('prompt injection')
+            || msg.includes('jailbreak detected')
+            || (msg.includes('422') && msg.includes('guardrail') && !msg.includes('output'));
+    }
+
+    function isTsgDatasetGuardrailError(errorMsg) {
+        return isSpecIntelGuardrailUploadError(errorMsg) || isSpecIntelOutputGuardrailError(errorMsg);
+    }
+
+    function isSpecIntelOutputGuardrailError(errorMsg) {
+        const msg = String(errorMsg || '').toLowerCase();
+        return msg.includes('dataset_output_guardrails_failed')
+            || msg.includes('output failed validation')
+            || (msg.includes('422') && msg.includes('output') && msg.includes('guardrail'));
     }
 
     resetSpecIntelMetrics();
@@ -7033,6 +7366,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const file = e.target.files[0];
             if (file) {
                 try {
+                    specIntelUploadSnapshot = snapshotSpecIntelDocumentState();
+                    clearSpecIntelSectionSelection();
+
                     showLoading('Uploading document...');
                     
                     // Test backend connection first (non-blocking - don't fail if health check fails)
@@ -7088,7 +7424,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (!response.ok) {
                             const errorText = await response.text();
                             console.error('[app.js] API error response:', errorText);
-                            throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                            const parseFn = window.API?.parseGuardrailHttpErrorBody;
+                            const info = typeof parseFn === 'function'
+                                ? parseFn(errorText)
+                                : { message: errorText, guardrailFindings: [], isGuardrailBlock: false };
+                            const err = new Error(`HTTP error! status: ${response.status} - ${info.message}`);
+                            err.guardrailDetail = info.guardrailDetail || null;
+                            err.guardrailFindings = info.guardrailFindings || [];
+                            err.guardrailReasons = info.guardrailReasons || [];
+                            err.isGuardrailBlock = Boolean(info.isGuardrailBlock);
+                            throw err;
                         }
                         
                         uploadResult = await response.json();
@@ -7096,6 +7441,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     console.log('[app.js] ✅ Upload completed, result:', uploadResult);
+                    specIntelUploadSnapshot = null;
                     currentFileId = uploadResult.file_id;
                     selectedDocument = file.name;
                     
@@ -7135,6 +7481,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         
                     const sectionList = Array.isArray(sections?.sections) ? sections.sections : [];
+                    selectedMainSection = null;
+                    if (sectionBtn) {
+                        const sectionSpan = sectionBtn.querySelector('span');
+                        if (sectionSpan) sectionSpan.textContent = 'Choose Section';
+                    }
                     updateSectionDropdown(sectionList);
 
                     // Real-time metrics: sections count after document load
@@ -7165,14 +7516,43 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Hide progress indicators on error
                     hideSectionProgress();
+                    hideSubsectionProgress();
+
+                    const errorMsg = error.message || String(error);
+                    const guardrailPayload = extractGuardrailPayload(error);
+                    const guardrailRejected = guardrailPayload.isGuardrailBlock
+                        || isSpecIntelGuardrailUploadError(errorMsg);
+
+                    if (guardrailRejected) {
+                        clearSpecIntelSectionSelection({ fullDocumentReset: true });
+                    } else if (specIntelUploadSnapshot) {
+                        restoreSpecIntelDocumentState(specIntelUploadSnapshot);
+                    } else {
+                        clearSpecIntelSectionSelection({ fullDocumentReset: true });
+                    }
+                    specIntelUploadSnapshot = null;
                     
                     // Provide specific error messages
-                    const errorMsg = error.message || String(error);
-                    if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError')) {
+                    if (guardrailRejected) {
+                        showGuardrailRejectionModal(
+                            guardrailPayload.findings,
+                            guardrailPayload.reasons,
+                            'Document blocked — prompt injection / jailbreak detected'
+                        );
+                        showStatusBar(
+                            'See the details popup for page, paragraph, line, and matched text.',
+                            'error',
+                            'Upload rejected'
+                        );
+                    } else if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError')) {
                         const apiUrl = (window.API && window.API.API_BASE_URL) || 'http://127.0.0.1:8000';
                         showStatusBar('Cannot connect to backend. Please make sure the backend server is running on '+ apiUrl, 'error');
                     } else if (errorMsg.includes('Backend is not running')) {
                         showStatusBar('Backend server is not running. Please start it with: cd Backend && python main.py', 'error');
+                    } else if (errorMsg.includes('413') || errorMsg.toLowerCase().includes('exceeds maximum size')) {
+                        showStatusBar('File is too large. Reduce size or increase GUARDRAILS_MAX_UPLOAD_MB on the backend.', 'error');
+                    } else if (errorMsg.includes('422') && !guardrailRejected) {
+                        showStatusBar('Document rejected by input security checks. Review file content and try again.', 'error');
                     } else {
                         // Show error with more context
                         console.error('[app.js] Upload error details:', errorMsg);
@@ -7545,77 +7925,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 hideProgressBar();
                 
                 if (result.success) {
+                    const guardrailNote = result.output_guardrails?.passed
+                        ? ' Output guardrails passed (schema, hierarchy, traceability, NLI groundedness).'
+                        : '';
                     showStatusBar(
-                        `Dataset extraction completed! Created ${result.clause_files_count} clause files. Output saved to: ${result.output_file}`, 
+                        `Dataset extraction completed! Created ${result.clause_files_count} clause files.${guardrailNote}`, 
                         'success'
                     );
                     
-                    // Store the specific dataset folder path for opening
-                    let datasetFolderPath = null;
                     console.log('📁 Full result object:', JSON.stringify(result, null, 2));
-                    console.log('📁 result.files_created:', result.files_created);
-                    console.log('📁 result.output_file:', result.output_file);
-                    
-                    // Try multiple ways to get the dataset folder path
-                    if (result.files_created?.clause_files && result.files_created.clause_files.length > 0) {
-                        // Extract the folder path from the first clause file path
-                        const firstClauseFile = result.files_created.clause_files[0];
-                        console.log('📁 First clause file path:', firstClauseFile);
-                        const pathParts = firstClauseFile.split(/[/\\]/);
-                        // Remove the filename and get the folder path
-                        pathParts.pop();
-                        datasetFolderPath = pathParts.join('/').replace(/\\/g, '/');
-                        console.log('📁 Extracted dataset folder path from clause_files:', datasetFolderPath);
-                    } else if (result.output_file) {
-                        // Fallback: Use output_file path, go up to datasets folder
-                        const outputPath = result.output_file.replace(/\\/g, '/');
-                        console.log('📁 Using output_file path:', outputPath);
-                        const pathParts = outputPath.split('/');
-                        // Remove filename
-                        pathParts.pop();
-                        // Try to find the datasets folder in the path
-                        const datasetsIndex = pathParts.indexOf('datasets');
-                        if (datasetsIndex >= 0 && datasetsIndex + 1 < pathParts.length) {
-                            // Include datasets folder and subsection folder
-                            datasetFolderPath = pathParts.slice(0, datasetsIndex + 2).join('/');
-                        } else {
-                            // Just remove filename
-                        datasetFolderPath = pathParts.join('/');
-                        }
-                        console.log('📁 Extracted dataset folder path from output_file:', datasetFolderPath);
-                    } else {
-                        // Last resort: construct from output_directory if available
-                        console.warn('⚠️ No file paths found in result, trying to construct from directories');
-                        if (outputDirectory) {
-                            datasetFolderPath = outputDirectory.replace(/\\/g, '/') + '/datasets';
-                            console.log('📁 Constructed dataset folder path from outputDirectory:', datasetFolderPath);
+
+                    const { absTotal, absFolder } = applyExtractionPathResult(result);
+                    let datasetFolderPath = absFolder;
+
+                    if (!datasetFolderPath && result.files_created?.clause_files?.length > 0) {
+                        const firstClauseFile = normalizeDatasetFilesystemPath(result.files_created.clause_files[0]);
+                        if (firstClauseFile) {
+                            datasetFolderPath = firstClauseFile.replace(/\/[^/]+$/, '');
+                            currentDatasetFolderPath = datasetFolderPath;
                         }
                     }
-                    
-                    // Show the "Open Dataset"button after successful extraction
+
+                    if (!currentTotalContentFilePath && absTotal) {
+                        currentTotalContentFilePath = absTotal;
+                    }
+
                     console.log('📁 Final dataset folder path:', datasetFolderPath);
-                    console.log('📁 Calling showOpenDatasetButton with path:', datasetFolderPath);
-                    const resolvedFolder = normalizeDatasetFilesystemPath(datasetFolderPath);
-                    if (resolvedFolder) {
-                        datasetFolderPath = resolvedFolder;
-                    }
-                    showOpenDatasetButton(datasetFolderPath);
+                    console.log('📁 total_content path:', currentTotalContentFilePath);
+                    showOpenDatasetButton(datasetFolderPath || currentDatasetFolderPath);
 
-                    // Store absolute paths under Backend/resources/extract for Send → TSG
-                    const normalizedFolder = datasetFolderPath
-                        ? datasetFolderPath.replace(/\\/g, '/').replace(/\/$/, '')
-                        : buildDatasetFolderPathFromSelection();
-                    if (normalizedFolder) {
-                        currentDatasetFolderPath = normalizedFolder;
-                    }
-
-                    const rawTotalContent = (
-                        result.total_content_file
-                        || result.files_created?.total_content
-                        || (normalizedFolder ? `${normalizedFolder}/total_content.txt` : null)
-                    );
-                    currentTotalContentFilePath = normalizeDatasetFilesystemPath(rawTotalContent)
-                        || (normalizedFolder ? `${normalizedFolder}/total_content.txt` : null);
+                    const normalizedFolder = currentDatasetFolderPath
+                        || datasetFolderPath
+                        || buildDatasetFolderPathFromSelection();
 
                     // Real-time metrics: total files in dataset folder (not clause_files only)
                     let entriesCount = 0;
@@ -7649,7 +7990,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 
             } catch (error) {
                 hideProgressBar();
-                showStatusBar('Failed to generate dataset: '+ error.message, 'error');
+                const errMsg = error.message || String(error);
+                if (errMsg.includes('content filter') || errMsg.includes('jailbreak') || errMsg.includes('content management policy')) {
+                    showStatusBar(
+                        'Azure blocked this text (jailbreak filter). Try another subsection or adjust Prompt Shields in Azure AI Foundry.',
+                        'error',
+                        'Extraction blocked'
+                    );
+                } else if (isSpecIntelOutputGuardrailError(errMsg)) {
+                    const cleaned = errMsg
+                        .replace(/^HTTP error! status: \d+, message: /, '')
+                        .replace(/^HTTP error! status: \d+ - /, '');
+                    showStatusBar(
+                        cleaned || 'Extraction output failed validation. Dataset was not saved.',
+                        'error',
+                        'Output guardrails blocked'
+                    );
+                    hideOpenDatasetButton();
+                } else if (errMsg.includes('guardrail') || errMsg.includes('422')) {
+                    showStatusBar(errMsg.replace(/^HTTP error! status: \d+ - /, ''), 'error', 'Extraction blocked');
+                } else {
+                    showStatusBar('Failed to generate dataset: ' + errMsg, 'error');
+                }
                 console.error('Generation error:', error);
             }
         });
@@ -9940,6 +10302,180 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
         }
     }
 
+    function clearTsgNliPanel() {
+        const panel = document.getElementById('testDatasetNliPanel');
+        if (!panel) return;
+        panel.style.display = 'none';
+        panel.innerHTML = '';
+    }
+
+    function extractNliFromOutputGuardrails(outputGuardrails) {
+        const nli = outputGuardrails?.nli_groundedness_validation || {};
+        const details = nli.details || {};
+        const highlights = Array.isArray(details.nli_highlights) ? details.nli_highlights : [];
+        const contradictions = Array.isArray(details.contradictions) ? details.contradictions : [];
+        const neutralFindings = Array.isArray(details.neutral_findings) ? details.neutral_findings : [];
+        return {
+            pairsChecked: details.pairs_checked ?? 0,
+            contradictions,
+            neutralFindings,
+            highlights,
+            neutralWarnings: (nli.warnings || []).filter((w) => String(w).toLowerCase().includes('nli neutral')),
+            contradictionWarnings: (nli.warnings || []).filter((w) => String(w).toLowerCase().includes('nli contradiction')),
+            errors: nli.errors || [],
+            passed: nli.passed !== false,
+            advisoryMode: details.advisory_mode === true,
+            datasetMatched: details.dataset_matched !== false,
+        };
+    }
+
+    function buildHighlightedDatasetHtml(content, highlights) {
+        if (!content || !Array.isArray(highlights) || !highlights.length) {
+            return '';
+        }
+
+        const escapeHtml = (value) => String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+
+        const lineClass = {};
+        highlights.forEach((item) => {
+            const classification = item.classification === 'contradiction' ? 'contradiction' : 'neutral';
+            const lineNo = item.line_number;
+            if (lineNo) {
+                if (classification === 'contradiction' || lineClass[lineNo] !== 'contradiction') {
+                    lineClass[lineNo] = classification;
+                }
+            }
+        });
+
+        const lines = String(content).split('\n');
+        let html = '<div class="tsg-nli-panel__preview"><div class="tsg-nli-panel__preview-title">Dataset review (highlighted lines)</div>';
+        html += '<div class="tsg-nli-highlight-view">';
+        lines.forEach((line, index) => {
+            const lineNo = index + 1;
+            const cls = lineClass[lineNo];
+            const rowClass = cls === 'contradiction'
+                ? 'tsg-nli-line tsg-nli-line--contradiction'
+                : cls === 'neutral'
+                    ? 'tsg-nli-line tsg-nli-line--neutral'
+                    : 'tsg-nli-line';
+            html += `<div class="${rowClass}"><span class="tsg-nli-line__no">${lineNo}</span><span class="tsg-nli-line__text">${escapeHtml(line) || '&nbsp;'}</span></div>`;
+        });
+        html += '</div></div>';
+        return html;
+    }
+
+    function renderTsgNliPanel(outputGuardrails, inputGuardrails, datasetContent) {
+        const panel = document.getElementById('testDatasetNliPanel');
+        if (!panel) return;
+
+        if (!outputGuardrails) {
+            clearTsgNliPanel();
+            return;
+        }
+
+        const nli = extractNliFromOutputGuardrails(outputGuardrails);
+        const details = outputGuardrails?.nli_groundedness_validation?.details || {};
+        const uploadType = (details.upload_type || 'file').toUpperCase();
+        const uploadName = details.upload_filename || '';
+        const datasetMatched = details.dataset_matched !== false;
+        const datasetTitle = details.dataset_title || '';
+        const allWarnings = outputGuardrails?.nli_groundedness_validation?.warnings || [];
+
+        const hasContradictions = nli.contradictions.length > 0
+            || nli.contradictionWarnings.length > 0;
+        const hasNeutral = nli.neutralFindings.length > 0
+            || nli.neutralWarnings.length > 0;
+        const hasInfoWarnings = allWarnings.some((w) => {
+            const lower = String(w).toLowerCase();
+            return !lower.includes('nli neutral') && !lower.includes('nli contradiction');
+        });
+
+        const escapeHtml = (value) => String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+
+        let html = '<div class="tsg-nli-panel__inner">';
+        html += `<div class="tsg-nli-panel__title">NLI &amp; Guardrails Review (${uploadType}${uploadName ? `: ${escapeHtml(uploadName)}` : ''})</div>`;
+
+        if (inputGuardrails?.passed !== false) {
+            html += '<div class="tsg-nli-panel__section tsg-nli-panel__section--ok">Input guardrails: PASS</div>';
+        }
+
+        if (!datasetMatched) {
+            html += '<div class="tsg-nli-panel__section tsg-nli-panel__section--warn">Spec Intelligence dataset: not matched</div>';
+            if (hasInfoWarnings) {
+                html += '<ul class="tsg-nli-panel__list tsg-nli-panel__list--warn">';
+                for (const warning of allWarnings) {
+                    html += `<li>${escapeHtml(warning)}</li>`;
+                }
+                html += '</ul>';
+            } else {
+                html += '<div class="tsg-nli-panel__section">Reference document loaded. NLI groundedness against O-RAN source was not applied.</div>';
+            }
+        } else {
+            html += `<div class="tsg-nli-panel__section tsg-nli-panel__section--ok">Dataset matched: ${escapeHtml(datasetTitle)}</div>`;
+            if (nli.advisoryMode) {
+                html += '<div class="tsg-nli-panel__section tsg-nli-panel__section--info">Review mode: contradictions and neutral findings are highlighted; upload is not blocked.</div>';
+            }
+            html += `<div class="tsg-nli-panel__section">NLI pairs checked: ${nli.pairsChecked}</div>`;
+
+            if (hasContradictions) {
+                html += '<div class="tsg-nli-panel__section tsg-nli-panel__section--error">Contradictions (red)</div><ul class="tsg-nli-panel__list">';
+                for (const item of nli.contradictions) {
+                    const score = typeof item.contradiction === 'number'
+                        ? `${(item.contradiction * 100).toFixed(0)}%`
+                        : '';
+                    const lineLabel = item.line_number ? `Line ${item.line_number}: ` : '';
+                    const source = item.clause_id === 'oran_subsection' ? 'O-RAN source' : `Clause ${item.clause_id || 'unknown'}`;
+                    html += `<li><strong>${source}</strong>${score ? ` (${score})` : ''}: ${lineLabel}${escapeHtml(item.hypothesis_preview)}</li>`;
+                }
+                html += '</ul>';
+            }
+
+            if (hasNeutral) {
+                html += '<div class="tsg-nli-panel__section tsg-nli-panel__section--warn">Neutral (yellow)</div><ul class="tsg-nli-panel__list tsg-nli-panel__list--warn">';
+                for (const item of nli.neutralFindings) {
+                    const score = typeof item.neutral === 'number'
+                        ? `${(item.neutral * 100).toFixed(0)}%`
+                        : '';
+                    const lineLabel = item.line_number ? `Line ${item.line_number}: ` : '';
+                    html += `<li>${lineLabel}${score ? `(${score}) ` : ''}${escapeHtml(item.hypothesis_preview)}</li>`;
+                }
+                html += '</ul>';
+            }
+
+            if (!hasContradictions && !hasNeutral && nli.pairsChecked > 0) {
+                html += '<div class="tsg-nli-panel__section tsg-nli-panel__section--ok">No contradictions or neutral findings.</div>';
+            }
+
+            const previewContent = datasetContent || (typeof currentTestDataset === 'string' ? currentTestDataset : '');
+            if (previewContent && nli.highlights.length) {
+                html += buildHighlightedDatasetHtml(previewContent, nli.highlights);
+            }
+        }
+
+        html += '</div>';
+        panel.innerHTML = html;
+        panel.style.display = 'block';
+    }
+
+    function clearTestDatasetSelection() {
+        const testDatasetFilesInput = document.getElementById('testDatasetFiles');
+        if (testDatasetFilesInput) {
+            const dt = new DataTransfer();
+            testDatasetFilesInput.files = dt.files;
+            testDatasetFilesInput.value = '';
+        }
+        currentTestDataset = null;
+        hideSelectedFiles();
+    }
+
     /** Stage total_content.txt into the hidden file input (Specification Intelligence → Test Script Generator). */
     async function stageTotalContentFileForTestScriptGenerator(filePath) {
         const fileInput = document.getElementById('testDatasetFiles');
@@ -9948,28 +10484,50 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
             return false;
         }
 
-        const readFn = window.API?.readFileForUpload;
-        if (typeof readFn !== 'function') {
-            showStatusBar('Cannot read dataset file from disk in this environment', 'error');
-            return false;
-        }
+        let fileName = 'total_content.txt';
+        let fileContent = null;
 
-        let readResult;
         try {
-            readResult = await readFn(filePath, workingDirectory);
-        } catch (err) {
-            console.error('readFileForUpload failed:', err);
-            showStatusBar(`Could not read total_content.txt: ${err.message}`, 'error');
-            return false;
+            const backendPayload = await fetchTotalContentFromBackend();
+            if (backendPayload?.success && backendPayload.content != null) {
+                fileContent = backendPayload.content;
+                fileName = backendPayload.name || fileName;
+                if (backendPayload.path) {
+                    currentTotalContentFilePath = backendPayload.path;
+                    currentDatasetFolderPath = backendPayload.folder || backendPayload.path.replace(/\/total_content\.txt$/i, '');
+                }
+                console.log('[app.js] ✅ Loaded total_content.txt via backend API:', backendPayload.path);
+            }
+        } catch (backendErr) {
+            console.warn('[app.js] Backend total-content fetch failed, trying local read:', backendErr);
         }
 
-        if (!readResult?.success) {
-            showStatusBar(`Could not read total_content.txt: ${readResult?.error || 'unknown error'}`, 'error');
-            return false;
+        if (fileContent == null) {
+            const readFn = window.API?.readFileForUpload;
+            if (typeof readFn !== 'function') {
+                showStatusBar('Cannot read dataset file — backend API and local file read unavailable', 'error');
+                return false;
+            }
+
+            let readResult;
+            try {
+                readResult = await readFn(filePath, workingDirectory || specIntelBackendExtractRoot);
+            } catch (err) {
+                console.error('readFileForUpload failed:', err);
+                showStatusBar(`Could not read total_content.txt: ${err.message}`, 'error');
+                return false;
+            }
+
+            if (!readResult?.success) {
+                showStatusBar(`Could not read total_content.txt: ${readResult?.error || 'unknown error'}`, 'error');
+                return false;
+            }
+
+            fileName = readResult.name || fileName;
+            fileContent = readResult.content;
         }
 
-        const fileName = readResult.name || 'total_content.txt';
-        const blob = new Blob([readResult.content], { type: 'text/plain' });
+        const blob = new Blob([fileContent], { type: 'text/plain' });
         const file = new File([blob], fileName, { type: 'text/plain', lastModified: Date.now() });
         const dt = new DataTransfer();
         dt.items.add(file);
@@ -10619,7 +11177,29 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
                 
                 if (!apiResponse.ok) {
                     const errorText = await apiResponse.text();
-                    throw new Error(`HTTP error! status: ${apiResponse.status} - ${errorText}`);
+                    let detailMessage = errorText;
+                    let outputGuardrails = null;
+                    try {
+                        const parsed = JSON.parse(errorText);
+                        const detail = parsed.detail;
+                        if (typeof detail === 'string') {
+                            detailMessage = detail;
+                        } else if (typeof detail === 'object' && detail?.message) {
+                            detailMessage = detail.message;
+                            if (detail.error === 'document_blocked_by_guardrails' && Array.isArray(detail.reasons) && detail.reasons.length) {
+                                detailMessage = `${detail.message} ${detail.reasons.slice(0, 3).join('; ')}`;
+                            }
+                            if (detail.error === 'dataset_output_guardrails_failed' && Array.isArray(detail.reasons) && detail.reasons.length) {
+                                detailMessage = `${detail.message} ${detail.reasons.slice(0, 3).join('; ')}`;
+                            }
+                            outputGuardrails = detail.output_guardrails || null;
+                        }
+                    } catch (_e) { /* use raw */ }
+                    const fetchErr = new Error(`HTTP error! status: ${apiResponse.status}, message: ${detailMessage}`);
+                    if (outputGuardrails) {
+                        fetchErr.outputGuardrails = outputGuardrails;
+                    }
+                    throw fetchErr;
                 }
                 
                 response = await apiResponse.json();
@@ -10639,10 +11219,28 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
                 updateProgressDialog(progressDialog, 100, 'Complete!');
                 
                 if (statusDiv) {
-                    statusDiv.textContent = `Dataset loaded successfully (${response.files_loaded} files)`;
+                    const nliDetails = response.guardrails?.output?.nli_groundedness_validation?.details || {};
+                    const highlights = Array.isArray(nliDetails.nli_highlights) ? nliDetails.nli_highlights : [];
+                    const contra = highlights.filter((h) => h.classification === 'contradiction').length;
+                    const neutral = highlights.filter((h) => h.classification === 'neutral').length;
+                    let guardrailNote = '';
+                    if (contra || neutral) {
+                        guardrailNote = ` (NLI review: ${contra} contradiction, ${neutral} neutral — see highlights)`;
+                    } else if (response.guardrails?.output?.passed) {
+                        guardrailNote = ' (output guardrails + NLI passed)';
+                    }
+                    statusDiv.textContent = `Dataset loaded successfully (${response.files_loaded} files)${guardrailNote}`;
                     statusDiv.style.color = '#28a745';
                 }
-                showStatusBar('Dataset loaded successfully', 'success');
+                showStatusBar(
+                    response.message || 'Dataset loaded successfully',
+                    'success'
+                );
+                if (response.guardrails?.output) {
+                    renderTsgNliPanel(response.guardrails.output, response.guardrails?.input, response.content);
+                } else {
+                    clearTsgNliPanel();
+                }
                 updateTsgStatusBar();
             } else {
                 if (statusDiv) {
@@ -10653,11 +11251,34 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
             }
         } catch (error) {
             console.error('Error loading dataset:', error);
+            const errMsg = error.message || String(error);
             if (statusDiv) {
                 statusDiv.textContent = 'Error loading dataset';
                 statusDiv.style.color = '#dc3545';
             }
-            showStatusBar('Error loading dataset', 'error');
+            if (isTsgDatasetGuardrailError(errMsg)) {
+                const cleaned = errMsg
+                    .replace(/^HTTP error! status: \d+, message: /, '')
+                    .replace(/^HTTP error! status: \d+ - /, '');
+                if (error.outputGuardrails) {
+                    renderTsgNliPanel(error.outputGuardrails, null, currentTestDataset);
+                    if (statusDiv) {
+                        statusDiv.textContent = 'Dataset blocked — NLI/output guardrails failed';
+                        statusDiv.style.color = '#dc3545';
+                    }
+                }
+                showStatusBar(
+                    cleaned || 'Dataset blocked by security guardrails.',
+                    'error',
+                    'Dataset upload blocked'
+                );
+                if (fileInput) {
+                    fileInput.value = '';
+                }
+                clearTestDatasetSelection();
+            } else {
+                showStatusBar('Error loading dataset: ' + errMsg, 'error');
+            }
         } finally {
             // Reset button state
             if (loadBtn) {
@@ -15920,6 +16541,7 @@ Do not skip or merge scenarios — extract comprehensive test cases from every r
 
                 // Reset UI back to empty state
                 hideSelectedFiles();
+                clearTsgNliPanel();
                 if (loadTestDatasetBtn) {
                     loadTestDatasetBtn.disabled = false;
                     loadTestDatasetBtn.textContent = 'Load';

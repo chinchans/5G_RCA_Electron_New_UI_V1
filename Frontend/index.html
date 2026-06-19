@@ -1054,6 +1054,7 @@
                                                 <div class="tsg-dataset-info">
                                                     <p id="testDatasetStatus">No Dataset loaded</p>
                                                     <div id="testDatasetFileList" style="display: none;"></div>
+                                                    <div id="testDatasetNliPanel" class="tsg-nli-panel" style="display: none;" aria-live="polite"></div>
                                                 </div>
                                                 <div class="tsg-dataset-action">
                                                     <button id="loadTestDatasetBtn" class="tsg-btn tsg-btn-outline tsg-btn-sm" type="button">Load</button>
@@ -2326,7 +2327,7 @@
     <!-- External JavaScript file for better debugging -->
     <!-- CRITICAL: api.js MUST load before app.js to initialize window.API -->
     <!-- Scripts load synchronously by default, so order matters -->
-    <script src="api.js"></script>
+    <script src="api.js?v=20260609-guardrails2"></script>
     <script>
         // Verify window.API was initialized immediately after api.js loads
         (function() {
@@ -2358,7 +2359,7 @@
             }
         })();
     </script>
-    <script src="app.js"></script>
+    <script src="app.js?v=20260609-guardrails2"></script>
     
     <!-- Deployment Settings Modal -->
     <div id="deploymentSettingsModal" class="modal-overlay" style="display: none;">

@@ -2595,6 +2595,111 @@ button:not(.back-button):not(.menu-toggle):not(.template-modal-close):not(.close
     width: auto;
 }
 
+.tsg-nli-panel {
+    margin-top: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    border-radius: 8px;
+    background: rgba(93, 146, 255, 0.06);
+    border: 1px solid rgba(93, 146, 255, 0.18);
+}
+
+.tsg-nli-panel__inner {
+    font-size: 0.8rem;
+    text-align: left;
+}
+
+.tsg-nli-panel__title {
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+    color: #374151;
+}
+
+.tsg-nli-panel__section {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.tsg-nli-panel__section--error {
+    color: #dc3545;
+}
+
+.tsg-nli-panel__section--warn {
+    color: #d97706;
+}
+
+.tsg-nli-panel__section--ok {
+    color: #28a745;
+}
+
+.tsg-nli-panel__list {
+    margin: 0 0 0.5rem 1rem;
+    padding: 0;
+}
+
+.tsg-nli-panel__list--warn li {
+    color: #92400e;
+}
+
+.tsg-nli-panel__list li {
+    margin-bottom: 0.25rem;
+}
+
+.tsg-nli-panel__section--info {
+    color: #2563eb;
+    font-weight: 500;
+}
+
+.tsg-nli-panel__preview {
+    margin-top: 0.65rem;
+}
+
+.tsg-nli-panel__preview-title {
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+    color: #374151;
+}
+
+.tsg-nli-highlight-view {
+    max-height: 280px;
+    overflow: auto;
+    border: 1px solid rgba(93, 146, 255, 0.2);
+    border-radius: 6px;
+    background: #fff;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.72rem;
+    line-height: 1.45;
+}
+
+.tsg-nli-line {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.15rem 0.45rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.tsg-nli-line__no {
+    flex: 0 0 2rem;
+    color: #9ca3af;
+    text-align: right;
+    user-select: none;
+}
+
+.tsg-nli-line__text {
+    flex: 1;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.tsg-nli-line--contradiction {
+    background: #fee2e2;
+    border-left: 3px solid #dc2626;
+}
+
+.tsg-nli-line--neutral {
+    background: #fef9c3;
+    border-left: 3px solid #ca8a04;
+}
+
 .tsg-legacy-dropdown {
     display: none !important;
     visibility: hidden;

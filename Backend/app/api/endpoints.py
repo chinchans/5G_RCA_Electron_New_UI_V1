@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks
 from typing import Optional, List, Dict, Any
 import os
+import re
 import sys
 import json
 import shutil
@@ -10,6 +11,18 @@ from datetime import datetime, timedelta
 import sqlite3
 from pathlib import Path
 from app.services.dataset_generator import DatasetExtractor
+from app.guardrails import (
+    cleanup_failed_extraction,
+    get_spec_intel_guardrail,
+    validate_saved_dataset_on_disk,
+    validate_tsg_dataset_upload,
+)
+from app.guardrails.config import (
+    LEGACY_SPEC_INTEL_EXTRACT_ROOT,
+    SPEC_INTEL_DATASETS_DIR,
+    SPEC_INTEL_EXTRACT_ROOT,
+    SPEC_INTEL_UPLOAD_JSON_DIR,
+)
 from app.services.recursive_test_graph_attach import (
     get_main_sections,
     get_subsections,
@@ -36,6 +49,24 @@ from pathlib import Path
 # This file is at: Backend/app/api/endpoints.py
 # So Backend is: __file__.parent.parent.parent
 BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+
+
+def _spec_intel_extract_roots() -> List[Path]:
+    """Primary extract root (Backend/extract) plus legacy resources/extract."""
+    return [SPEC_INTEL_EXTRACT_ROOT.resolve(), LEGACY_SPEC_INTEL_EXTRACT_ROOT.resolve()]
+
+
+def _save_spec_intel_upload_json(result: Dict[str, Any], file_id: str) -> str:
+    """Persist successful Spec Intelligence upload API result to extract/JSON files/."""
+    SPEC_INTEL_UPLOAD_JSON_DIR.mkdir(parents=True, exist_ok=True)
+    json_path = SPEC_INTEL_UPLOAD_JSON_DIR / f"{Path(file_id).stem}.upload.json"
+    payload = {
+        **result,
+        "uploaded_at": datetime.now().isoformat(),
+        "upload_result_json": str(json_path.resolve()),
+    }
+    json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return str(json_path.resolve())
 
 # Add the Error_fixing_pipelin directory to the Python path (matching PyQt UI)
 current_dir = Path(__file__).parent.parent
@@ -247,44 +278,75 @@ async def get_uploaded_files():
 # Global storage for job status (in production, use Redis or database)
 job_status = {}
 
+@router.get("/api/dataset/guardrails/status")
+async def get_dataset_guardrails_status():
+    """Return Specification Intelligence input guardrail configuration and health."""
+    guardrail = get_spec_intel_guardrail()
+    return {"success": True, "guardrails": guardrail.status()}
+
+
 @router.post("/api/dataset/upload-document")
 async def upload_document(file: UploadFile = File(...)):
-    """Upload a document for dataset generation."""
+    """Upload a document for dataset generation (with input guardrails)."""
     print("="*80)
     print("📤 DATASET UPLOAD ENDPOINT CALLED")
     print("="*80)
     print(f"📁 File name: {file.filename}")
     print(f"📁 Content type: {file.content_type}")
+    guardrail = get_spec_intel_guardrail()
+    file_path = None
     try:
-        # Create the upload directory if it doesn't exist
         upload_dir = BACKEND_DIR / "resources" / "uploaded_docs"
         upload_dir.mkdir(parents=True, exist_ok=True)
         print(f"📁 Upload directory: {upload_dir}")
-        
-        # Generate a unique filename to avoid conflicts
-        file_extension = Path(file.filename).suffix if file.filename else ""
+
+        # Layer 1: size, extension, magic-byte validation
+        content, file_extension = await guardrail.validate_and_read_upload(file)
         unique_filename = f"{uuid.uuid4()}{file_extension}"
         file_path = upload_dir / unique_filename
         print(f"📁 Saving to: {file_path}")
-        
-        # Save the uploaded file
+
         with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
+            buffer.write(content)
+
         file_size = file_path.stat().st_size
         print(f"✅ File saved successfully: {file_size} bytes")
-        
+
+        # Layers 2–3: Llama Guard + injection pattern scan on document text
+        print("🛡️ Running input guardrails (Llama Guard / injection scan)...")
+        verdict = guardrail.scan_file(file_path, context="upload")
+        print(f"🛡️ Guardrail verdict: passed={verdict.passed}, blocked={verdict.blocked}")
+        if verdict.reasons:
+            print(f"🛡️ Reasons: {verdict.reasons}")
+        guardrail.raise_if_blocked(verdict)
+
         result = {
             "message": "Document uploaded successfully",
             "file_id": unique_filename,
             "filename": file.filename,
-            "file_path": str(file_path),
-            "file_size": file_size
+            "file_path": str(file_path.resolve()),
+            "file_size": file_size,
+            "guardrails": verdict.to_dict(),
         }
+        result["upload_result_json"] = _save_spec_intel_upload_json(result, unique_filename)
+        print(f"📤 Upload result JSON saved: {result['upload_result_json']}")
         print(f"📤 Returning result: {result}")
         print("="*80)
         return result
+    except HTTPException:
+        if file_path and file_path.exists():
+            try:
+                file_path.unlink()
+                print(f"🗑️ Removed rejected upload: {file_path}")
+            except OSError:
+                pass
+        raise
     except Exception as e:
+        if file_path and file_path.exists():
+            try:
+                file_path.unlink()
+            except OSError:
+                pass
         print(f"❌ ERROR in upload_document: {str(e)}")
         import traceback
         traceback.print_exc()
@@ -348,9 +410,9 @@ async def get_document_subsections(file_id: str, section: str):
 async def set_working_directory(directory_path: str = Form(...)):
     """Set the working directory for dataset generation."""
     try:
-        # Use Backend/resources/extract as default if path matches old dummy path
+        # Use Backend/extract as default if path matches old dummy path
         # Project root: C:\Users\ChanduVangala\Desktop\RCA_Electron-main\RCA_Electron-main
-        default_working_dir = BACKEND_DIR / "resources" / "extract"
+        default_working_dir = SPEC_INTEL_EXTRACT_ROOT
         
         # Handle old dummy paths or use provided path
         if directory_path in [
@@ -420,16 +482,14 @@ async def process_dataset_generation(job_id: str, file_id: str, section: str, su
         file_path = BACKEND_DIR / "resources" / "uploaded_docs" / file_id
         extractor = DatasetExtractor()
         
-        # Always use backend/resources/extract for storing extracted files (per user preference)
-        # This ensures all extracted text files are stored in the backend resources folder
-        working_dir = str(BACKEND_DIR / "resources" / "extract")
-        output_dir = str(BACKEND_DIR / "resources" / "extract")
+        # Store datasets under Backend/extract/datasets
+        working_dir = str(SPEC_INTEL_EXTRACT_ROOT)
+        output_dir = str(SPEC_INTEL_EXTRACT_ROOT)
         
-        # Ensure the extract directory exists
-        Path(working_dir).mkdir(parents=True, exist_ok=True)
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        SPEC_INTEL_EXTRACT_ROOT.mkdir(parents=True, exist_ok=True)
+        SPEC_INTEL_DATASETS_DIR.mkdir(parents=True, exist_ok=True)
         
-        print(f"📁 Using backend resources folder for extraction:")
+        print(f"📁 Using Spec Intelligence extract folder:")
         print(f"   Working directory: {working_dir}")
         print(f"   Output directory: {output_dir}")
         
@@ -599,16 +659,14 @@ async def extract_dataset_pyqt_style(
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="Document not found")
         
-        # Always use backend/resources/extract for storing extracted files (per user preference)
-        # This ensures all extracted text files are stored in the backend resources folder
-        working_dir = str(Path("resources") / "extract")
-        output_dir = str(Path("resources") / "extract")
+        # Store datasets under Backend/extract/datasets
+        working_dir = str(SPEC_INTEL_EXTRACT_ROOT)
+        output_dir = str(SPEC_INTEL_EXTRACT_ROOT)
         
-        # Ensure the extract directory exists
-        Path(working_dir).mkdir(parents=True, exist_ok=True)
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        SPEC_INTEL_EXTRACT_ROOT.mkdir(parents=True, exist_ok=True)
+        SPEC_INTEL_DATASETS_DIR.mkdir(parents=True, exist_ok=True)
         
-        print(f"📁 Using backend resources folder for extraction:")
+        print(f"📁 Using Spec Intelligence extract folder:")
         print(f"   Working directory: {working_dir}")
         print(f"   Output directory: {output_dir}")
         
@@ -617,11 +675,16 @@ async def extract_dataset_pyqt_style(
         print(f"Subsection: {subsection}")
         print(f"Working Directory: {working_dir}")
         print(f"Output Directory: {output_dir}")
+
+        # Re-scan uploaded document before extraction (defense in depth)
+        guardrail = get_spec_intel_guardrail()
+        upload_verdict = guardrail.scan_file(file_path, context="pre_extract")
+        guardrail.raise_if_blocked(upload_verdict)
         
         # Initialize extractor
         extractor = DatasetExtractor()
         
-        # Call the PyQt-style extraction method (synchronous)
+        # Extraction (output guardrails run before dataset is finalized)
         result = extractor.extract_dataset_pyqt_style(
             str(file_path),
             section,
@@ -629,32 +692,123 @@ async def extract_dataset_pyqt_style(
             output_dir,
             working_dir
         )
-        
+
+        print("=" * 60)
+        print("OUTPUT GUARDRAILS — validate saved files under extract/datasets")
+        print("=" * 60)
+
+        validated_dataset, output_verdict = validate_saved_dataset_on_disk(
+            result,
+            file_id=file_id,
+            source_document_path=str(file_path.resolve()),
+            section=section,
+            subsection=subsection,
+        )
+
+        if output_verdict.blocked:
+            print(f"❌ Output guardrails failed: {output_verdict.all_errors}")
+            cleanup_failed_extraction(result)
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "dataset_output_guardrails_failed",
+                    "message": "Extraction output failed validation. Dataset was not saved.",
+                    "reasons": output_verdict.all_errors,
+                    "output_guardrails": output_verdict.to_dict(),
+                },
+            )
+
+        # Persist validation manifest alongside dataset
+        if validated_dataset:
+            manifest_path = Path(validated_dataset.metadata.dataset_folder) / "dataset_manifest.json"
+            manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "validated": True,
+                        "pipeline": [
+                            "input_guardrails",
+                            "extraction",
+                            "dataset_files_on_disk",
+                            "schema_validation",
+                            "hierarchy_validation",
+                            "source_traceability_validation",
+                            "nli_groundedness_validation",
+                            "save_dataset",
+                            "ready_for_test_script_generator",
+                        ],
+                        "output_guardrails": output_verdict.to_dict(),
+                        "metadata": validated_dataset.metadata.model_dump(),
+                        "ready_for_test_script_generator": True,
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+
         print("=" * 60)
         print("DATASET EXTRACTION COMPLETED SUCCESSFULLY")
         print("=" * 60)
         
-        # Return results immediately (no job tracking needed)
+        # Return absolute paths so the frontend/Electron can locate files reliably
+        def _abs_dataset_path(p: Optional[str]) -> Optional[str]:
+            if not p:
+                return None
+            path_obj = Path(p)
+            if not path_obj.is_absolute():
+                path_obj = (BACKEND_DIR / path_obj).resolve()
+            else:
+                path_obj = path_obj.resolve()
+            return str(path_obj)
+
+        files_created = result.get("files_created") or {}
+        abs_files_created = {
+            "initial_text": _abs_dataset_path(files_created.get("initial_text")),
+            "total_content": _abs_dataset_path(files_created.get("total_content")),
+            "graph_json": _abs_dataset_path(files_created.get("graph_json")),
+            "clause_files": [_abs_dataset_path(f) for f in files_created.get("clause_files") or []],
+        }
+        abs_total_content = _abs_dataset_path(result.get("total_content_file"))
+        dataset_folder = str(Path(abs_total_content).parent) if abs_total_content else None
+
         return {
             "success": True,
             "message": result["message"],
-            "output_file": result["output_file"],
-            "total_content_file": result["total_content_file"],
+            "output_file": _abs_dataset_path(result.get("output_file")),
+            "total_content_file": abs_total_content,
+            "dataset_folder": dataset_folder,
             "clause_files_count": result["clause_files_count"],
             "references_found": len(result["references"]),
             "clauses_found": len(result["clauses"]),
             "present_references": len(result["present_references"]),
             "missing_references": len(result["missing_references"]),
-            "files_created": result["files_created"]
+            "files_created": abs_files_created,
+            "output_guardrails": output_verdict.to_dict(),
+            "ready_for_test_script_generator": True,
         }
         
     except HTTPException:
         raise
+    except ValueError as e:
+        msg = str(e)
+        if "guardrail" in msg.lower() or "content filter" in msg.lower() or "jailbreak" in msg.lower():
+            raise HTTPException(status_code=422, detail=msg) from e
+        raise HTTPException(status_code=500, detail=f"Dataset extraction failed: {msg}") from e
     except Exception as e:
-        print(f"ERROR in dataset extraction: {str(e)}")
+        err_msg = str(e)
+        print(f"ERROR in dataset extraction: {err_msg}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Dataset extraction failed: {str(e)}")
+        if "content_filter" in err_msg.lower() or "jailbreak" in err_msg.lower():
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Azure OpenAI blocked this specification text (jailbreak content filter). "
+                    "This is often a false positive on technical documents. "
+                    "Try another subsection, or set Prompt Shields to 'annotate' in Azure AI Foundry."
+                ),
+            ) from e
+        raise HTTPException(status_code=500, detail=f"Dataset extraction failed: {err_msg}") from e
 
 
 # Pydantic Models for Test Script Generator
@@ -1266,37 +1420,131 @@ async def upload_reference_code(file: UploadFile = File(...)):
 
 @router.post("/api/test-script/load-dataset")
 async def load_test_dataset(files: List[UploadFile] = File(...)):
-    """Load dataset from multiple files for test script generation"""
+    """Load dataset files for test script generation (with Spec Intelligence input guardrails)."""
+    if not files:
+        raise HTTPException(status_code=400, detail="No dataset files provided")
+
+    guardrail = get_spec_intel_guardrail()
+    upload_dir = BACKEND_DIR / "resources" / "datasets"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    saved_paths: List[Path] = []
+    guardrail_results: List[Dict[str, Any]] = []
+    original_filenames: List[str] = []
+
     try:
-        # Create upload directory
-        upload_dir = Path("resources/datasets")
-        upload_dir.mkdir(parents=True, exist_ok=True)
-        
-        file_paths = []
         for file in files:
-            # Generate unique filename
-            file_extension = Path(file.filename).suffix if file.filename else ""
+            content, file_extension = await guardrail.validate_and_read_upload(file)
             unique_filename = f"{uuid.uuid4()}{file_extension}"
             file_path = upload_dir / unique_filename
-            
-            # Save file
+
             with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-            
-            file_paths.append(str(file_path))
-        
-        # Load dataset
+                buffer.write(content)
+
+            saved_paths.append(file_path)
+            original_filenames.append(file.filename or "")
+
+            verdict = guardrail.scan_file(file_path, context="tsg_dataset_upload")
+            guardrail_results.append(
+                {
+                    "filename": file.filename,
+                    "saved_as": unique_filename,
+                    "file_path": str(file_path.resolve()),
+                    "guardrails": verdict.to_dict(),
+                }
+            )
+            guardrail.raise_if_blocked(verdict)
+
+        print("=" * 60)
+        print("TSG DATASET UPLOAD — output guardrails (NLI groundedness)")
+        print("=" * 60)
+
+        _, output_verdict, output_applicable = validate_tsg_dataset_upload(
+            saved_paths,
+            original_filenames=original_filenames,
+        )
+
+        if output_applicable and output_verdict and output_verdict.blocked:
+            for path in saved_paths:
+                try:
+                    path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "dataset_output_guardrails_failed",
+                    "message": "Dataset upload failed output validation (schema, hierarchy, traceability, or NLI groundedness).",
+                    "reasons": output_verdict.all_errors,
+                    "output_guardrails": output_verdict.to_dict(),
+                },
+            )
+
+        file_paths = [str(p) for p in saved_paths]
         dataset_content = test_script_generator.load_dataset(file_paths)
-        
-        return {
+
+        response_payload: Dict[str, Any] = {
             "success": True,
             "content": dataset_content,
             "files_loaded": len(file_paths),
-            "message": "Dataset loaded successfully"
+            "message": "Dataset loaded successfully",
+            "guardrails": {
+                "passed": True,
+                "blocked": False,
+                "input": {
+                    "passed": True,
+                    "blocked": False,
+                    "files": guardrail_results,
+                },
+            },
         }
-        
+
+        if output_applicable and output_verdict:
+            response_payload["guardrails"]["output"] = output_verdict.to_dict()
+            details = output_verdict.groundedness.details or {}
+            upload_type = details.get("upload_type", "file")
+            dataset_title = details.get("dataset_title", "unknown")
+            if details.get("dataset_matched"):
+                highlights = details.get("nli_highlights") or []
+                contra = sum(1 for h in highlights if h.get("classification") == "contradiction")
+                neutral = sum(1 for h in highlights if h.get("classification") == "neutral")
+                if contra or neutral:
+                    response_payload["message"] = (
+                        f"Dataset loaded successfully with NLI review findings "
+                        f"({contra} contradiction(s), {neutral} neutral) — "
+                        f"upload not blocked ({upload_type.upper()}, title: {dataset_title})."
+                    )
+                else:
+                    response_payload["message"] = (
+                        f"Dataset loaded successfully. NLI groundedness passed "
+                        f"({upload_type.upper()}, O-RAN + 3GPP checks, title: {dataset_title})."
+                    )
+            elif upload_type == "pdf":
+                response_payload["message"] = (
+                    "PDF loaded successfully. Input guardrails passed; "
+                    "NLI panel shows review status (no Spec Intelligence dataset match)."
+                )
+            else:
+                response_payload["message"] = (
+                    "Dataset loaded successfully. Input guardrails and NLI review completed."
+                )
+
+        return response_payload
+
+    except HTTPException:
+        for path in saved_paths:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error loading dataset: {str(e)}")
+        for path in saved_paths:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise HTTPException(status_code=500, detail=f"Error loading dataset: {str(e)}") from e
 
 @router.get("/api/test-script/test-types")
 async def get_test_types():
@@ -1943,15 +2191,115 @@ async def get_deployment_config_files():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list config files: {str(e)}")
 
+def _resolve_under_extract_root(path_str: str) -> Path:
+    """Resolve a dataset path under Backend/extract or legacy resources/extract."""
+    candidate = Path(path_str)
+    if not candidate.is_absolute():
+        candidate = (BACKEND_DIR / path_str).resolve()
+    else:
+        candidate = candidate.resolve()
+    for extract_root in _spec_intel_extract_roots():
+        try:
+            candidate.relative_to(extract_root)
+            return candidate
+        except ValueError:
+            continue
+    raise HTTPException(status_code=403, detail="Path is outside the extract directory")
+
+
+def _iter_datasets_dirs() -> List[Path]:
+    dirs: List[Path] = []
+    for root in _spec_intel_extract_roots():
+        datasets_dir = root / "datasets"
+        if datasets_dir.is_dir():
+            dirs.append(datasets_dir)
+    return dirs
+
+
+def _find_total_content_path(subsection: Optional[str] = None, path: Optional[str] = None) -> Path:
+    """Locate total_content.txt under Backend/extract/datasets (or legacy path)."""
+    if path:
+        candidate = _resolve_under_extract_root(path)
+        if candidate.is_dir():
+            candidate = candidate / "total_content.txt"
+        return candidate
+
+    if not subsection or not str(subsection).strip():
+        raise HTTPException(status_code=400, detail="subsection or path is required")
+
+    safe = re.sub(r'[\\/*?:"<>|]', "_", subsection.strip())
+    subsection_lower = subsection.strip().lower()
+    best_match: Optional[Path] = None
+
+    for datasets_dir in _iter_datasets_dirs():
+        exact = datasets_dir / safe / "total_content.txt"
+        if exact.is_file():
+            return exact.resolve()
+
+        for folder in datasets_dir.iterdir():
+            if not folder.is_dir():
+                continue
+            total_file = folder / "total_content.txt"
+            if not total_file.is_file():
+                continue
+            name_lower = folder.name.lower()
+            if name_lower == subsection_lower or subsection_lower in name_lower or name_lower in subsection_lower:
+                best_match = total_file.resolve()
+                break
+        if best_match:
+            break
+
+    if best_match:
+        return best_match
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"total_content.txt not found for subsection '{subsection}' under extract/datasets",
+    )
+
+
+@router.get("/api/dataset/total-content")
+async def read_dataset_total_content(
+    subsection: Optional[str] = None,
+    path: Optional[str] = None,
+):
+    """
+    Read total_content.txt for Specification Intelligence → Test Script Generator handoff.
+    Resolves paths under Backend/extract (or legacy resources/extract).
+    """
+    try:
+        total_path = _find_total_content_path(subsection=subsection, path=path)
+        if not total_path.is_file():
+            raise HTTPException(status_code=404, detail=f"File not found: {total_path}")
+
+        content = total_path.read_text(encoding="utf-8", errors="replace")
+        return {
+            "success": True,
+            "name": total_path.name,
+            "path": str(total_path),
+            "folder": str(total_path.parent),
+            "size": total_path.stat().st_size,
+            "content": content,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read total_content.txt: {str(e)}") from e
+
+
 @router.get("/api/dataset/extract-folder-path")
 async def get_extract_folder_path():
     """Get the path to the extract folder where dataset files are stored."""
     try:
-        extract_path = Path("resources/extract").absolute()
+        extract_path = SPEC_INTEL_EXTRACT_ROOT.resolve()
+        datasets_path = SPEC_INTEL_DATASETS_DIR.resolve()
+        SPEC_INTEL_EXTRACT_ROOT.mkdir(parents=True, exist_ok=True)
+        SPEC_INTEL_DATASETS_DIR.mkdir(parents=True, exist_ok=True)
         
         return {
             "success": True,
             "extract_path": str(extract_path),
+            "datasets_path": str(datasets_path),
             "message": f"Extract folder path: {extract_path}"
         }
         

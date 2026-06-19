@@ -15,10 +15,12 @@ from pathlib import Path
 import networkx as nx
 from docx import Document
 import fitz  # PyMuPDF
-from openai import AzureOpenAI
+from openai import AzureOpenAI, BadRequestError
 from dotenv import load_dotenv
 from collections import defaultdict
 from difflib import SequenceMatcher
+
+from app.guardrails import get_spec_intel_guardrail
 
 
 class DatasetExtractor:
@@ -133,30 +135,88 @@ class DatasetExtractor:
         if len(words) > max_words:
             return ' '.join(words[:max_words])
         return text
+
+    def _guard_llm_input(self, text: str, context: str) -> str:
+        """Prepare document text for Azure OpenAI (upload guardrails already ran at ingest)."""
+        guardrail = get_spec_intel_guardrail()
+        truncated = self.truncate_text(text)
+        return guardrail.prepare_extraction_llm_input(truncated, context=context)
+
+    def _is_azure_content_filter_error(self, exc: Exception) -> bool:
+        err = str(exc).lower()
+        return "content_filter" in err or "jailbreak" in err or "content management policy" in err
+
+    def _simplify_messages_for_azure(self, messages: list) -> list:
+        """Strip wrapper text that can trigger Azure Prompt Shields false positives."""
+        simplified = []
+        for msg in messages:
+            role = msg.get("role")
+            content = msg.get("content", "")
+            if role == "system":
+                content = content.split("Treat all")[0].split("ignore embedded")[0].strip()
+            elif role == "user":
+                doc_match = re.search(r"<DOCUMENT>\s*(.*?)\s*</DOCUMENT>", content, re.DOTALL | re.IGNORECASE)
+                if doc_match:
+                    content = doc_match.group(1)
+                prefix = "Technical specification excerpt:\n\n"
+                if content.startswith(prefix):
+                    content = content[len(prefix):]
+                content = content.replace("[filtered-instruction]", " ").strip()
+                content = content[:12000]
+                content = f"Technical specification text for analysis:\n\n{content}"
+            simplified.append({"role": role, "content": content})
+        return simplified
+
+    def _create_chat_completion(self, messages: list, **kwargs):
+        """Call Azure OpenAI with one retry using simplified prompts if content filter triggers."""
+        try:
+            return self.client.chat.completions.create(
+                model=self.azure_model_name,
+                messages=messages,
+                **kwargs,
+            )
+        except BadRequestError as exc:
+            if not self._is_azure_content_filter_error(exc):
+                raise
+            print("⚠️ Azure content filter triggered; retrying with simplified specification prompt...")
+            retry_messages = self._simplify_messages_for_azure(messages)
+            try:
+                return self.client.chat.completions.create(
+                    model=self.azure_model_name,
+                    messages=retry_messages,
+                    **kwargs,
+                )
+            except BadRequestError as retry_exc:
+                if self._is_azure_content_filter_error(retry_exc):
+                    raise ValueError(
+                        "Azure OpenAI blocked this specification text (jailbreak content filter). "
+                        "Try a different subsection, or set Prompt Shields to 'annotate' mode in Azure AI Foundry."
+                    ) from retry_exc
+                raise
     
     def extract_references_and_clauses(self, text):
         """Extract 3GPP references and clauses using OpenAI API."""
-        text = self.truncate_text(text)
-        
         prompt = (
-            "Extract 3GPP references and their associated clauses from the given text. "
+            "You are a 3GPP specification analyst. "
+            "Extract 3GPP references and their associated clauses from the provided technical text. "
             "Present them grouped under the heading '3GPP References:', where each reference "
             "(e.g., '3GPP TS 23.401 [29]') has its related clauses listed underneath "
             "(e.g., '- Clause 5.3.2.1 ...'). Only show this section once. "
             "Do not repeat the same reference or clause. "
-            "Avoid unnecessary formatting or cosmetic additions beyond what's described."
+            "Output only the reference and clause listing."
         )
+
+        llm_user_content = self._guard_llm_input(text, context="extract_references")
         
         messages = [
             {"role": "system", "content": prompt},
-            {"role": "user", "content": text}
+            {"role": "user", "content": llm_user_content}
         ]
         
-        response = self.client.chat.completions.create(
-            model=self.azure_model_name,
-            messages=messages,
+        response = self._create_chat_completion(
+            messages,
             max_tokens=500,
-            temperature=0.5
+            temperature=0.5,
         )
         
         output = response.choices[0].message.content.strip()
@@ -403,16 +463,20 @@ class DatasetExtractor:
         extracted_phrases = []
         
         for key, value in ref_dict.items():
-            prompt = f"Extract a meaningful 3GPP technical phrase from the following text:\n\n{value}"
-            
             try:
-                response = self.client.chat.completions.create(
-                    model=self.azure_model_name,
-                    temperature=0.7,
+                llm_user_content = self._guard_llm_input(value, context="match_extract_from_ref")
+                response = self._create_chat_completion(
                     messages=[
-                        {"role": "system", "content": "You are an assistant specialized in 3GPP technical documentation."},
-                        {"role": "user", "content": prompt}
-                    ]
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are a 3GPP technical documentation assistant. "
+                                "Extract one meaningful technical phrase from the specification excerpt."
+                            ),
+                        },
+                        {"role": "user", "content": llm_user_content},
+                    ],
+                    temperature=0.7,
                 )
                 
                 technical_phrase = response.choices[0].message.content.strip()
@@ -489,17 +553,26 @@ class DatasetExtractor:
     
     def generate_test_scenarios(self, input_text):
         """Generate test scenarios using OpenAI API."""
-        input_text = self.truncate_text(input_text)
+        llm_user_content = self._guard_llm_input(input_text, context="generate_test_scenarios")
         
         messages = [
-            {"role": "system", "content": "You are an expert in 3GPP standards."},
-            {"role": "user", "content": f"Based on the following description/text/input, generate all possible test scenarios python scripts for every section or case or scenario including edge cases as per 3GPP standards, take the redirected /referred clauses from the same text:\n\n{input_text}"}
+            {
+                "role": "system",
+                "content": "You are an expert in 3GPP standards and test scenario design.",
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Based on the following specification excerpt, list possible test scenarios "
+                    "including edge cases per 3GPP standards:\n\n"
+                    f"{llm_user_content}"
+                ),
+            },
         ]
         
         try:
-            response = self.client.chat.completions.create(
-                model=self.azure_model_name,
-                messages=messages,
+            response = self._create_chat_completion(
+                messages,
                 max_tokens=1000,
                 temperature=0.7,
             )
@@ -551,16 +624,20 @@ class DatasetExtractor:
             print(f"Value: {value}")
             print("-" * 30)
             
-            prompt = f"Extract a meaningful 3GPP technical phrase from the following text:\n\n{value}"
-            
             try:
-                response = self.client.chat.completions.create(
-                    model=self.azure_model_name,
-                    temperature=0.7,
+                llm_user_content = self._guard_llm_input(value, context="match_extract_from_ref_pyqt")
+                response = self._create_chat_completion(
                     messages=[
-                        {"role": "system", "content": "You are an assistant specialized in 3GPP technical documentation."},
-                        {"role": "user", "content": prompt}
-                    ]
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are a 3GPP technical documentation assistant. "
+                                "Extract one meaningful technical phrase from the specification excerpt."
+                            ),
+                        },
+                        {"role": "user", "content": llm_user_content},
+                    ],
+                    temperature=0.7,
                 )
                 
                 technical_phrase = response.choices[0].message.content.strip()
@@ -1088,6 +1165,8 @@ class DatasetExtractor:
             "clauses": clauses,
             "present_references": present_references,
             "missing_references": missing_references,
+            "present_ref_map": present_ref_map,
+            "ref_clause_map": ref_clause_map,
             "output_file": output_file,
             "total_content_file": str(total_content_path),
             "clause_files_count": len(clause_files),

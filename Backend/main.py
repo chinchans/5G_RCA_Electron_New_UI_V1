@@ -21,6 +21,19 @@ else:
 
 from app.api.endpoints import router
 
+try:
+    from app.guardrails import get_spec_intel_guardrail
+    _guardrail_status = get_spec_intel_guardrail().status()
+    print(
+        f"🛡️ Spec Intel guardrails: enabled={_guardrail_status.get('enabled')}, "
+        f"backend={_guardrail_status.get('backend')}, "
+        f"model_loaded={_guardrail_status.get('model_loaded')}"
+    )
+    if _guardrail_status.get("model_error"):
+        print(f"🛡️ Guardrail note: {_guardrail_status.get('model_error')} (rules-only fallback may apply)")
+except Exception as _guard_err:
+    print(f"⚠️ Could not initialize guardrail status: {_guard_err}")
+
 # Configuration
 HOST = "localhost"
 PORT = 8000

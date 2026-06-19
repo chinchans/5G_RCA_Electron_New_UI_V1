@@ -90,8 +90,13 @@ ipcMain.handle('list-files-in-directory', async (event, { folderPath }) => {
 });
 
 function getBackendExtractRoot() {
-    // main.js lives in Frontend/ — Backend extract root is sibling Backend/resources/extract
-    return path.join(path.resolve(__dirname, '..'), 'Backend', 'resources', 'extract');
+    const backendRoot = path.join(path.resolve(__dirname, '..'), 'Backend');
+    const primary = path.join(backendRoot, 'extract');
+    const legacy = path.join(backendRoot, 'resources', 'extract');
+    try {
+        if (fs.existsSync(primary)) return primary;
+    } catch (_) { /* fall through */ }
+    return legacy;
 }
 
 /** Resolve dataset file paths that may be relative to Backend, not Electron cwd (Frontend). */
@@ -99,6 +104,7 @@ function resolveDatasetFilePath(filePath, workingDirectory) {
     if (!filePath || typeof filePath !== 'string') return null;
 
     const backendExtract = getBackendExtractRoot();
+    const backendRoot = path.join(path.resolve(__dirname, '..'), 'Backend');
     const normalizedInput = filePath.replace(/\\/g, '/');
     const candidates = [];
 
@@ -125,6 +131,9 @@ function resolveDatasetFilePath(filePath, workingDirectory) {
 
         addCandidate(path.join(backendExtract, relNoExtractPrefix));
         addCandidate(path.join(backendExtract, rel));
+        addCandidate(path.join(backendRoot, rel));
+        addCandidate(path.join(backendRoot, 'extract', relNoExtractPrefix));
+        addCandidate(path.join(backendRoot, 'resources', 'extract', relNoExtractPrefix));
 
         if (rel.includes('datasets/')) {
             const fromDatasets = rel.substring(rel.indexOf('datasets/'));
@@ -135,6 +144,9 @@ function resolveDatasetFilePath(filePath, workingDirectory) {
             addCandidate(path.resolve(workingDirectory, filePath));
             addCandidate(path.join(workingDirectory, relNoExtractPrefix));
             addCandidate(path.join(workingDirectory, rel));
+            if (relNoExtractPrefix && !relNoExtractPrefix.startsWith('datasets/')) {
+                addCandidate(path.join(workingDirectory, 'datasets', relNoExtractPrefix));
+            }
         }
     }
 
@@ -164,7 +176,7 @@ ipcMain.handle('read-file-for-upload', async (event, { filePath, workingDirector
         if (!resolved) {
             return {
                 success: false,
-                error: `File not found: ${filePath} (searched under Backend/resources/extract)`
+                error: `File not found: ${filePath} (searched under Backend/extract and Backend/resources/extract)`
             };
         }
         const stat = fs.statSync(resolved);
