@@ -32,8 +32,6 @@ MIN_SENTENCE_CHARS = 25
 MIN_WORD_LEN = 3
 MODIFICATION_TAG_RE = re.compile(r"\[MODIFICATION\s+\d+:\s*(\w+)\]\s*", re.IGNORECASE)
 MIN_SOURCE_ALIGN_SCORE = 20.0
-DECORATIVE_SEPARATOR_RE = re.compile(r"^[\s=*#\-_~.+>|/\\]+$")
-MIN_DECORATIVE_LINE_LEN = 10
 
 # cross-encoder/nli-deberta-v3-small label order
 NLI_LABELS = ("contradiction", "entailment", "neutral")
@@ -49,14 +47,12 @@ class NliPairResult:
     top_label: str
     clause_id: Optional[str] = None
     hypothesis_text: str = ""
-    premise_text: str = ""
     line_number: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "clause_id": self.clause_id,
             "premise_preview": self.premise_preview,
-            "premise_text": self.premise_text,
             "hypothesis_preview": self.hypothesis_preview,
             "hypothesis_text": self.hypothesis_text,
             "line_number": self.line_number,
@@ -153,24 +149,12 @@ class _NliCrossEncoder:
 _nli_model = _NliCrossEncoder()
 
 
-def _is_decorative_separator_line(text: str) -> bool:
-    """True for explicit dataset separators (e.g. ======== or --------)."""
-    cleaned = text.strip()
-    if len(cleaned) < MIN_DECORATIVE_LINE_LEN:
-        return False
-    if not DECORATIVE_SEPARATOR_RE.match(cleaned):
-        return False
-    return bool(re.search(r"[=*#\-_~.+>|/\\]", cleaned))
-
-
 def _split_sentences(text: str) -> List[str]:
     parts = SENTENCE_SPLIT_RE.split(text.strip())
     sentences: List[str] = []
     for part in parts:
         cleaned = " ".join(part.split())
         if len(cleaned) >= MIN_SENTENCE_CHARS:
-            if _is_decorative_separator_line(cleaned):
-                continue
             sentences.append(cleaned)
     return sentences
 
@@ -465,7 +449,6 @@ def run_nli_groundedness(
 
         pair_result = NliPairResult(
             premise_preview=_truncate(premise, 120),
-            premise_text=premise,
             hypothesis_preview=_truncate(hypothesis, 120),
             hypothesis_text=hypothesis,
             line_number=_line_number_for_hypothesis(hypothesis, total_content),
