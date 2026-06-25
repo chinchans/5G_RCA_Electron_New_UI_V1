@@ -1,0 +1,1 @@
+[TEST] Simulated credential string for guardrail injection testing (not a real GitHub token).

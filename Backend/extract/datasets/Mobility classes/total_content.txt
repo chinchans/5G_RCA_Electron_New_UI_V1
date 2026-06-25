@@ -1,0 +1,13 @@
+Mobility classes
+The following classes of mobility shall be used for the applicable tests [13]:
+Stationary: 0 kph
+Pedestrian: 0 kph to 10 kph (typical value 4 kph)
+Vehicular: 10 kph to 120 kph (typical value 50 kph)
+High speed vehicular: 120 kph to 500 kph (typical value 150 kph)
+High speed vehicular speeds close to 500 kph are mainly used for high speed trains.
+
+
+==================================================
+RECURSIVE EXTRACTION RESULTS
+==================================================
+
